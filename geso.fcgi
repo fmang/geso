@@ -63,7 +63,7 @@ sub kill_player {
 sub playpause_player {
 	return if $player{status} eq OFF;
 	command_player(' ');
-	$player{status} eq PLAYING ? PAUSED : PLAYING;
+	$player{status} = $player{status} eq PLAYING ? PAUSED : PLAYING;
 }
 
 #-------------------------------------------------------------------------------
@@ -150,6 +150,7 @@ my %pages = (
 );
 
 while (new CGI::Fast) {
+	update_player();
 	my $url = url(-absolute => 1);
 	my $page = $pages{$url};
 	if ($page) {
