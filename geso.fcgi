@@ -131,7 +131,7 @@ sub traverse {
 
 sub status_page {
 	print header(-type => 'text/html', -charset => 'utf-8');
-	html_header();
+	html_header('Status');
 	print "<h2>Status: $player{status}</h2>";
 	print escapeHTML($player{file}) . "<br />" if $player{file};
 	print "PID " . $player{pid} . "<br />" if $player{pid};
@@ -147,8 +147,18 @@ sub status_page {
 		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
 		<li><a href="/chapter?seek=next">Next chapter</a></li>
 	</ul>
-	<h2>Files</h2>
+	<h2>Menu</h2>
+	<ul>
+		<li><a href="/library">Library</a></li>
+	</ul>
 EOF
+	html_footer();
+}
+
+sub library_page {
+	print header(-type => 'text/html', -charset => 'utf-8');
+	html_header('Library');
+	print '<h2>Library</h2>';
 	my $root = $ENV{DOCUMENT_ROOT};
 	traverse($root, '.');
 	html_footer();
@@ -213,6 +223,7 @@ my %pages = (
 	'/spawn' => \&spawn_page,
 	'/seek' => \&seek_page,
 	'/chapter' => \&chapter_page,
+	'/library' => \&library_page,
 );
 
 while (new CGI::Fast) {
