@@ -121,6 +121,8 @@ sub status_page {
 		<li><a href="/seek?time=-30">Seek -30s</a></li>
 		<li><a href="/seek?time=30">Seek +30s</a></li>
 		<li><a href="/seek?time=600">Seek +10m</a></li>
+		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
+		<li><a href="/chapter?seek=next">Next chapter</a></li>
 	</ul>
 	<h2>Files</h2>
 	<ul>
@@ -171,12 +173,29 @@ sub seek_page {
 	}
 }
 
+sub chapter_page {
+	my $seek = param('seek');
+	if ($player{status} ne OFF) {
+		if ($seek eq 'next') {
+			command_player('o');
+		} elsif ($seek eq 'previous') {
+			command_player('i');
+		} else {
+			print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
+			print "403 Forbidden\nInvalid direction.\n";
+			return;
+		}
+	}
+	print redirect('/');
+}
+
 my %pages = (
 	'/' => \&status_page,
 	'/playpause' => \&playpause_page,
 	'/stop' => \&stop_page,
 	'/spawn' => \&spawn_page,
 	'/seek' => \&seek_page,
+	'/chapter' => \&chapter_page,
 );
 
 while (new CGI::Fast) {
