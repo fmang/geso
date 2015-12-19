@@ -66,6 +66,20 @@ sub playpause_player {
 	$player{status} = $player{status} eq PLAYING ? PAUSED : PLAYING;
 }
 
+sub seek_player {
+	return if $player{status} eq OFF;
+	use integer;
+	my $time = shift;
+	my $abstime = abs($time);
+	my $big_steps = $abstime / 600;
+	my $small_steps = ($abstime % 600) / 30;
+	if ($time >= 30) {
+		command_player(("\027[A" x $big_steps) . ("\027[C" x $small_steps));
+	} elsif ($time <= -30) {
+		command_player(("\027[B" x $big_steps) . ("\027[D" x $small_steps));
+	}
+}
+
 #-------------------------------------------------------------------------------
 # Pages
 
@@ -103,6 +117,10 @@ sub status_page {
 	<ul>
 		<li><a href="/playpause">Play / Pause</a></li>
 		<li><a href="/stop">Stop</a></li>
+		<li><a href="/seek?time=-600">Seek -10m</a></li>
+		<li><a href="/seek?time=-30">Seek -30s</a></li>
+		<li><a href="/seek?time=30">Seek +30s</a></li>
+		<li><a href="/seek?time=600">Seek +10m</a></li>
 	</ul>
 	<h2>Files</h2>
 	<ul>
@@ -142,11 +160,23 @@ sub spawn_page {
 	}
 }
 
+sub seek_page {
+	my $time = param('time');
+	if ($time =~ /^[-+]?[0-9]+$/) {
+		seek_player($time);
+		print redirect('/');
+	} else {
+		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
+		print "403 Forbidden\nInvalid time $time.\n";
+	}
+}
+
 my %pages = (
 	'/' => \&status_page,
 	'/playpause' => \&playpause_page,
 	'/stop' => \&stop_page,
 	'/spawn' => \&spawn_page,
+	'/seek' => \&seek_page,
 );
 
 while (new CGI::Fast) {
