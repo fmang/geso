@@ -6,6 +6,7 @@ use utf8;
 
 use CGI qw(:standard);
 use CGI::Fast;
+use File::Find;
 use File::Spec::Functions;
 use IO::Handle;
 use String::ShellQuote qw(shell_quote);
@@ -106,6 +107,28 @@ sub html_footer {
 EOF
 }
 
+sub traverse {
+	print '<ul>';
+	my ($root, $base) = @_;
+	opendir(my $dh, catdir($root, $base));
+	foreach (sort readdir($dh)) {
+		next if /^\./;
+		my $path = catfile($root, $base, $_);
+		if (-d $path) {
+			print '<li><span>' . escapeHTML($_) . '</span>';
+			traverse($root, catdir($base, $_));
+			print '</li>';
+		} elsif (-f $path) {
+			print '<li><a href="/spawn?file='
+			    . escapeHTML(uri_escape(catfile($base, $_)))
+			    . '">' . escapeHTML($_) . '</a></li>';
+		}
+	}
+	closedir($dh);
+	print '</ul>';
+
+}
+
 sub status_page {
 	print header(-type => 'text/html', -charset => 'utf-8');
 	html_header();
@@ -125,18 +148,9 @@ sub status_page {
 		<li><a href="/chapter?seek=next">Next chapter</a></li>
 	</ul>
 	<h2>Files</h2>
-	<ul>
 EOF
 	my $root = $ENV{DOCUMENT_ROOT};
-	opendir(my $dh, $root);
-	while (my $file = readdir($dh)) {
-		next if $file =~ /^\./;
-		my $path = catfile($root, $file);
-		next unless -f $path;
-		print '<li><a href="/spawn?file=' . escapeHTML(uri_escape($file)) . '">' . escapeHTML($file) . '</a></li>';
-	}
-	closedir($dh);
-	print "</ul>";
+	traverse($root, '.');
 	html_footer();
 }
 
@@ -151,14 +165,17 @@ sub stop_page {
 }
 
 sub spawn_page {
+	# http://www.perlmonks.org/?node=Sanitizing%20user-provided%20path%2Ffilenames
 	my $file = param('file');
-	if ($file =~ /^[^\/\\]*$/) {
+	my $root = $ENV{DOCUMENT_ROOT};
+	my $abs = File::Spec->rel2abs($file, $root);
+	if ($abs =~ /^\Q$root/) {
 		my $root = $ENV{DOCUMENT_ROOT};
 		spawn_player(catfile($root, $file));
 		print redirect('/');
 	} else {
 		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
-		print "403 Forbidden\nInvalid file.\n";
+		print "403 Forbidden\nShady path.\n";
 	}
 }
 
