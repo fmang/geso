@@ -81,6 +81,94 @@ sub seek {
 #-------------------------------------------------------------------------------
 # YouTube
 
+package Geso::YouTube::Parser;
+
+use HTML::Parser ();
+
+use constant {
+	OUT => 0,
+	TIME => 1,
+	TITLE => 2,
+	USER => 3,
+	META => 4,
+};
+
+my $location = OUT;
+my $video = {};
+my $videos = [];
+
+sub start {
+	my ($tagname, $attr) = @_;
+	my $class = $attr->{class};
+	return unless $class;
+	if ($location eq OUT) {
+		if ($class eq 'video-time') {
+			$location = TIME;
+		} elsif ($class =~ 'yt-lockup-title ') {
+			$location = TITLE;
+		} elsif ($class =~ 'yt-lockup-byline') {
+			$location = USER;
+		} elsif ($class =~ 'yt-lockup-meta-info') {
+			$location = META;
+		}
+	} elsif ($tagname eq 'a') {
+		my $href = $attr->{href};
+		my $title = $attr->{title};
+		return unless $href;
+		if ($location eq TITLE) {
+			if ($title && $href =~ /^\/watch\?v=([^&]+)/) {
+				$video->{title} = $title;
+				$video->{id} = $1;
+			}
+		} elsif ($location eq USER) {
+			if ($href =~ /^\/user\/([^\/]+)/) {
+				$video->{user} = $1;
+			}
+		}
+	}
+}
+
+sub end {
+	my ($tagname) = @_;
+	if ($location eq META && $tagname eq 'li') {
+		# move on to the next element, duration
+	} else {
+		commit() if $location eq META;
+		$location = OUT;
+	}
+}
+
+sub text {
+	my ($text) = @_;
+	if ($location eq TIME) {
+		$video->{time} = $text;
+	} elsif ($location eq META) {
+		if ($text =~ /^([0-9][^ ]*)/) {
+			$video->{views} = $1;
+		}
+	}
+}
+
+sub commit {
+	push @$videos, $video if $video->{id};
+	$video = {};
+}
+
+sub parse {
+	my $in = shift;
+	my $p = HTML::Parser->new(
+		api_version => 3,
+		start_h => [\&start, 'tagname, attr'],
+		end_h => [\&end, 'tagname'],
+		text_h => [\&text, 'text'],
+	);
+	$p->unbroken_text(1);
+	$p->parse_file($in);
+	my $result = $videos;
+	$videos = [];
+	return @$result;
+}
+
 package Geso::YouTube;
 
 use File::Spec::Functions;
