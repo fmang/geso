@@ -175,7 +175,7 @@ package Geso::YouTube;
 
 use File::Spec::Functions;
 use LWP::UserAgent;
-use URI::Escape qw(uri_escape_utf8);
+use URI::Escape qw(uri_escape);
 use POSIX;
 
 use constant {
@@ -229,11 +229,11 @@ sub clear {
 
 sub search {
 	my ($query) = @_;
-	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape_utf8($query);
+	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
 	my $ua = LWP::UserAgent->new;
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
-		return Geso::YouTube::Parser::parse($res->decoded_content);
+		return Geso::YouTube::Parser::parse($res->content);
 	}
 }
 
@@ -243,18 +243,13 @@ sub search {
 package Geso::HTML;
 
 use CGI qw(escapeHTML);
-use Encode qw(encode_utf8);
 use File::Find;
 use File::Spec::Functions;
-use URI::Escape qw(uri_escape_utf8);
-
-sub escape {
-	return escapeHTML(encode_utf8(shift));
-}
+use URI::Escape qw(uri_escape);
 
 sub header {
 	my $title = shift;
-	$title = $title ? escape($title) . ' - Geso' : 'Geso';
+	$title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
 	print <<"EOF";
 <!doctype html>
 <html>
@@ -285,13 +280,13 @@ sub traverse {
 		next if /^\./;
 		my $path = catfile($root, $base, $_);
 		if (-d $path) {
-			print '<li><span>' . escape($_) . '</span>';
+			print '<li><span>' . escapeHTML($_) . '</span>';
 			traverse($root, catdir($base, $_));
 			print '</li>';
 		} elsif (-f $path) {
 			print '<li><a href="/spawn?file='
-			    . escape(uri_escape_utf8(catfile($base, $_)))
-			    . '">' . escape($_) . '</a></li>';
+			    . escapeHTML(uri_escape(catfile($base, $_)))
+			    . '">' . escapeHTML($_) . '</a></li>';
 		}
 	}
 	print '</ul>';
@@ -304,15 +299,14 @@ sub traverse {
 package Geso::Pages;
 
 use CGI qw(:standard);
-use Encode qw(decode_utf8);
 use File::Spec::Functions;
-use URI::Escape qw(uri_escape_utf8);
+use URI::Escape qw(uri_escape);
 
 sub status {
 	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('Status');
 	print "<h2>Status: $Geso::Player::state{status}</h2>";
-	print Geso::HTML::escape($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
+	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
 	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
 	print <<"EOF";
 	<h2>Actions</h2>
@@ -331,7 +325,7 @@ sub status {
 EOF
 	foreach (keys %Geso::YouTube::downloads) {
 		my $dl = $Geso::YouTube::downloads{$_};
-		print '<li>' . Geso::HTML::escape("$_ - $dl->{name} ($dl->{status})");
+		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
 		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
 		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
 		print " <a href=\"/youtube/play?v=$_\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
@@ -417,17 +411,16 @@ sub chapter {
 
 sub youtube_search {
 	my $query = param('q') or return print redirect('/');
-	$query = decode_utf8($query);
 	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('YouTube search');
 	print '<h2>YouTube results</h2>';
 	print '<ul>';
 	foreach (Geso::YouTube::search($query)) {
 		print '<li>'
-		. '<img src="' . Geso::HTML::escape($_->{thumbnail}) . '" />'
-		. "<a href=\"/youtube/download?v=$_->{id}&name=" . Geso::HTML::escape(uri_escape_utf8($_->{title})) . '">'
-		. Geso::HTML::escape($_->{title}) . '</a> '
-		. Geso::HTML::escape("($_->{time}, $_->{views} views) by $_->{user}.")
+		. "<img src=\"$_->{thumbnail}\" />"
+		. "<a href=\"/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title})) . '">'
+		. escapeHTML($_->{title}) . '</a> '
+		. escapeHTML("($_->{time}, $_->{views} views) by $_->{user}.")
 		. '</li>';
 	}
 	print '</ul>';
@@ -449,9 +442,7 @@ sub youtube_download {
 	my $id = param('v');
 	my $name = param('name');
 	my $dl = $Geso::YouTube::downloads{$id};
-	if ($name) {
-		$name = decode_utf8($name);
-	} elsif ($dl) {
+	if (!$name && $dl) {
 		$name = $dl->{name};
 	}
 	Geso::YouTube::download($id, $name) if $id and $name;
