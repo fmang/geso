@@ -14,7 +14,7 @@ use URI::Escape qw(uri_escape);
 use POSIX;
 
 #-------------------------------------------------------------------------------
-# Actions
+# Player
 
 use constant {
 	OFF => 'Off',
@@ -79,6 +79,33 @@ sub seek_player {
 	} elsif ($time <= -30) {
 		command_player(("\027[B" x $big_steps) . ("\027[D" x $small_steps));
 	}
+}
+
+#-------------------------------------------------------------------------------
+# YouTube
+
+my %youtube_dls = ();
+
+sub download_youtube {
+	my ($id, $name) = shift;
+	if (my $pid = fork()) {
+		$youtube_dls{$pid} = $name or $id;
+	} else {
+		chdir(catdir($ENV{DOCUMENT_ROOT}, "youtube")) or die "cannot open youtube directory: $!\n";
+		exec('youtube-dl', '--', $id);
+	}
+}
+
+sub update_youtube {
+	foreach (keys %youtube_dls) {
+		my $kid = waitpid($player{$_}, WNOHANG);
+		delete $youtube_dls{$_} if $kid > 0;
+	}
+}
+
+sub search_youtube {
+	my $query = shift;
+	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
 }
 
 #-------------------------------------------------------------------------------
@@ -147,9 +174,23 @@ sub status_page {
 		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
 		<li><a href="/chapter?seek=next">Next chapter</a></li>
 	</ul>
+	<h2>YouTube</h2>
+	<ul>
+EOF
+	foreach (keys %youtube_dls) {
+		print "<li>$_ - " . escapeHTML($youtube_dls{$_}) . '</li>';
+	}
+	print <<"EOF";
+	</ul>
 	<h2>Menu</h2>
 	<ul>
 		<li><a href="/library">Library</a></li>
+		<li>
+			<form action="/youtube">
+				<input name="q" />
+				<input type="submit" value="YouTube search" />
+			</form>
+		</li>
 	</ul>
 EOF
 	html_footer();
@@ -216,6 +257,12 @@ sub chapter_page {
 	print redirect('/');
 }
 
+sub youtube_page {
+	my $query = param('q');
+	return if not $query;
+
+}
+
 my %pages = (
 	'/' => \&status_page,
 	'/playpause' => \&playpause_page,
@@ -224,10 +271,12 @@ my %pages = (
 	'/seek' => \&seek_page,
 	'/chapter' => \&chapter_page,
 	'/library' => \&library_page,
+	'/youtube' => \&youtube_page,
 );
 
 while (new CGI::Fast) {
 	update_player();
+	update_youtube();
 	my $url = url(-absolute => 1);
 	my $page = $pages{$url};
 	if ($page) {
