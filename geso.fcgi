@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use utf8;
+use locale;
 
 #-------------------------------------------------------------------------------
 # Player
@@ -119,6 +119,7 @@ sub start {
 			if ($title && $href =~ /^\/watch\?v=([^&]+)/) {
 				$video->{title} = $title;
 				$video->{id} = $1;
+				$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg"
 			}
 		} elsif ($location eq USER) {
 			if ($href =~ /^\/user\/([^\/]+)/) {
@@ -174,31 +175,61 @@ package Geso::YouTube;
 
 use File::Spec::Functions;
 use LWP::UserAgent;
-use URI::Escape qw(uri_escape);
+use URI::Escape qw(uri_escape_utf8);
 use POSIX;
 
-my %youtube_dls = ();
+use constant {
+	DOWNLOADING => 'Downloading',
+	DONE => 'Done',
+	CANCELED => 'Canceled',
+	FAILED => 'Failed',
+};
+
+our %downloads = ();
 
 sub download {
-	my ($id, $name) = shift;
+	my ($id, $name) = @_;
+	if ($downloads{$id}) {
+		my $status = $downloads{$id}->{status};
+		return if $status eq DOWNLOADING or $status eq DONE;
+	}
 	if (my $pid = fork()) {
-		$youtube_dls{$pid} = $name or $id;
+		$downloads{$id} = { pid => $pid, name => $name, status => DOWNLOADING };
 	} else {
-		chdir(catdir($ENV{DOCUMENT_ROOT}, "youtube")) or die "cannot open youtube directory: $!\n";
-		exec('youtube-dl', '--', $id);
+		my $output = catfile($ENV{DOCUMENT_ROOT}, 'youtube', '%(title)s.%(id)s.%(ext)s');
+		exec('youtube-dl', '--output', $output, '--', $id);
 	}
 }
 
 sub update {
-	foreach (keys %youtube_dls) {
-		my $kid = waitpid($youtube_dls{$_}, WNOHANG);
-		delete $youtube_dls{$_} if $kid > 0;
+	foreach (keys %downloads) {
+		my $dl = $downloads{$_};
+		next if $dl->{status} ne DOWNLOADING;
+		my $kid = waitpid($dl->{pid}, WNOHANG);
+		next unless $kid > 0;
+		$dl->{status} = $? == 0 ? DONE : FAILED;
 	}
 }
 
+sub cancel {
+	my ($id) = @_;
+	my $dl = $downloads{$id} or return;
+	return if $dl->{status} ne DOWNLOADING;
+	kill 'TERM', $dl->{pid};
+	waitpid($dl->{pid}, 0);
+	$dl->{status} = CANCELED;
+}
+
+sub clear {
+	my ($id) = @_;
+	my $dl = $downloads{$id} or return;
+	return if $dl->{status} eq DOWNLOADING;
+	delete $downloads{$id};
+}
+
 sub search {
-	my $query = shift;
-	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
+	my ($query) = @_;
+	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape_utf8($query);
 	my $ua = LWP::UserAgent->new;
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
@@ -215,7 +246,7 @@ use CGI qw(escapeHTML);
 use Encode qw(encode_utf8);
 use File::Find;
 use File::Spec::Functions;
-use URI::Escape qw(uri_escape);
+use URI::Escape qw(uri_escape_utf8);
 
 sub escape {
 	return escapeHTML(encode_utf8(shift));
@@ -259,7 +290,7 @@ sub traverse {
 			print '</li>';
 		} elsif (-f $path) {
 			print '<li><a href="/spawn?file='
-			    . escape(uri_escape(catfile($base, $_)))
+			    . escape(uri_escape_utf8(catfile($base, $_)))
 			    . '">' . escape($_) . '</a></li>';
 		}
 	}
@@ -273,7 +304,9 @@ sub traverse {
 package Geso::Pages;
 
 use CGI qw(:standard);
+use Encode qw(decode_utf8);
 use File::Spec::Functions;
+use URI::Escape qw(uri_escape_utf8);
 
 sub status {
 	print header(-type => 'text/html', -charset => 'utf-8');
@@ -296,8 +329,14 @@ sub status {
 	<h2>YouTube</h2>
 	<ul>
 EOF
-	foreach (keys %Geso::YouTube::youtube_dls) {
-		print "<li>$_ - " . Geso::HTML::escape($Geso::YouTube::youtube_dls{$_}) . '</li>';
+	foreach (keys %Geso::YouTube::downloads) {
+		my $dl = $Geso::YouTube::downloads{$_};
+		print '<li>' . Geso::HTML::escape("$_ - $dl->{name} ($dl->{status})");
+		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
+		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
+		print " <a href=\"/youtube/play?v=$_\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
+		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
+		print '</li>';
 	}
 	print <<"EOF";
 	</ul>
@@ -305,7 +344,7 @@ EOF
 	<ul>
 		<li><a href="/library">Library</a></li>
 		<li>
-			<form action="/youtube">
+			<form action="/youtube/search">
 				<input name="q" />
 				<input type="submit" value="YouTube search" />
 			</form>
@@ -376,19 +415,54 @@ sub chapter {
 	print redirect('/');
 }
 
-sub youtube {
-	my $query = param('q');
-	return print redirect('/') if not $query;
+sub youtube_search {
+	my $query = param('q') or return print redirect('/');
+	$query = decode_utf8($query);
 	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('YouTube search');
 	print '<h2>YouTube results</h2>';
 	print '<ul>';
 	foreach (Geso::YouTube::search($query)) {
-		print '<li>';
-		print Geso::HTML::escape("$_->{id}: $_->{title} ($_->{time}, by $_->{user}, $_->{views} views)");
-		print '</li>';
+		print '<li>'
+		. '<img src="' . Geso::HTML::escape($_->{thumbnail}) . '" />'
+		. "<a href=\"/youtube/download?v=$_->{id}&name=" . Geso::HTML::escape(uri_escape_utf8($_->{title})) . '">'
+		. Geso::HTML::escape($_->{title}) . '</a> '
+		. Geso::HTML::escape("($_->{time}, $_->{views} views) by $_->{user}.")
+		. '</li>';
 	}
 	print '</ul>';
+}
+
+sub youtube_cancel {
+	my $id = param('v');
+	Geso::YouTube::cancel($id) if $id;
+	print redirect('/');
+}
+
+sub youtube_clear {
+	my $id = param('v');
+	Geso::YouTube::clear($id) if $id;
+	print redirect('/');
+}
+
+sub youtube_download {
+	my $id = param('v');
+	my $name = param('name');
+	my $dl = $Geso::YouTube::downloads{$id};
+	if ($name) {
+		$name = decode_utf8($name);
+	} elsif ($dl) {
+		$name = $dl->{name};
+	}
+	Geso::YouTube::download($id, $name) if $id and $name;
+	print redirect('/');
+}
+
+sub youtube_play {
+	my $id = param('v');
+	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
+	Geso::Player::spawn($file) if $file;
+	print redirect('/');
 }
 
 my %pages = (
@@ -399,7 +473,11 @@ my %pages = (
 	'/seek' => \&seek,
 	'/chapter' => \&chapter,
 	'/library' => \&library,
-	'/youtube' => \&youtube,
+	'/youtube/search' => \&youtube_search,
+	'/youtube/cancel' => \&youtube_cancel,
+	'/youtube/clear' => \&youtube_clear,
+	'/youtube/download' => \&youtube_download,
+	'/youtube/play' => \&youtube_play,
 );
 
 sub route {
