@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 use locale;
-use utf8;
 
 #-------------------------------------------------------------------------------
 # Player
@@ -316,13 +315,12 @@ sub status {
 	my $file = $Geso::Player::state{file};
 	if ($file) {
 		$file = File::Spec->abs2rel($file, $ENV{DOCUMENT_ROOT});
-		$file = decode_utf8($file);
-		$file =~ s|/| » |g;
+		$file =~ s|/| / |g;
 		$file = escapeHTML($file);
 	} else {
 		$file = '';
 	}
-	print encode_utf8(<<"EOF");
+	print <<"EOF";
 	<div id="state" class="$Geso::Player::state{status}">
 		<div class="status">
 			<span id="status">$Geso::Player::state{status}</span>
@@ -331,21 +329,21 @@ sub status {
 		<div class="actions">
 			<span class="section">
 				<b>Play</b>
-				<a href="/play" class="api play" title="Play">▶</a>
-				<a href="/pause" class="api pause on" title="Pause">⏸</a>
-				<a href="/stop" class="api on" title="Stop">◼</a>
+				<a href="/play" class="api play" title="Play">Play</a>
+				<a href="/pause" class="api pause on" title="Pause">Pause</a>
+				<a href="/stop" class="api on" title="Stop">Stop</a>
 			</span>
 			<span class="section">
 				<b>Seek</b>
-				<a href="/seek?time=-600" class="api on" title="Rewind 10 minutes">⏪ <span>10m</span></a>
-				<a href="/seek?time=-30" class="api on" title="Rewind 30 seconds">⏪ <span>30s</span></a>
-				<a href="/seek?time=30" class="api on" title="Forward 30 seconds">⏩ <span>30s</span></a>
-				<a href="/seek?time=600" class="api on" title="Forward 10 minutes">⏩ <span>10m</span></a>
+				<a href="/seek?time=-600" class="api on" title="Rewind 10 minutes">-10m</a>
+				<a href="/seek?time=-30" class="api on" title="Rewind 30 seconds">-30s</a>
+				<a href="/seek?time=30" class="api on" title="Forward 30 seconds">+30s</a>
+				<a href="/seek?time=600" class="api on" title="Forward 10 minutes">+10m</a>
 			</span>
 			<span class="section">
 				<b>Chapter</b>
-				<a href="/chapter?seek=previous" class="api on" title="Previous chapter">⏮</a>
-				<a href="/chapter?seek=next" class="api on" title="Next chapter">⏭</a>
+				<a href="/chapter?seek=previous" class="api on" title="Previous chapter">Previous</a>
+				<a href="/chapter?seek=next" class="api on" title="Next chapter">Next</a>
 			</span>
 		</div>
 	</div>
@@ -401,7 +399,6 @@ sub traverse {
 
 package Geso::Actions;
 
-use Encode qw(encode_utf8);
 use File::Spec::Functions;
 use JSON;
 
@@ -416,8 +413,7 @@ sub api_status {
 	my $file = $Geso::Player::state{file};
 	if ($file) {
 		$file = File::Spec->abs2rel($file, $ENV{DOCUMENT_ROOT});
-		my $quote = encode_utf8(' » ');
-		$file =~ s|/|$quote|g;
+		$file =~ s|/| / |g;
 	}
 	print to_json {
 		status => $Geso::Player::state{status},

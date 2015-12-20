@@ -8,11 +8,16 @@ body {
 #state {
 	background-color: #255a62;
 	color: #f4f1ea;
-	font-size: 1.4em;
+	font-size: 1.1em;
 }
 
 #state {
-	padding: 5px;
+	padding: 1px;
+}
+
+.status {
+	padding-bottom: 5px;
+	border-bottom: 1px solid #48b4a5;
 }
 
 .status, .actions {
@@ -22,13 +27,9 @@ body {
 
 #status {
 	text-transform: capitalize;
+	font-weight: bold;
+	padding-right: 10px;
 }
-
-#state #status { display: none; }
-
-#state.off #file:before { content: '◼ '; }
-#state.paused #file:before { content: '⏸ '; }
-#state.playing #file:before { content: '▶ '; }
 
 #state #file:before {
 	position: relative;
@@ -56,16 +57,11 @@ body {
 	color: #ccc;
 }
 
-.actions a span {
-	font-size: 0.8em;
-}
-
 .actions .section {
 	display: block;
 }
 
 .actions .section b {
-	font-size: 0.85em;
 	padding-right: 10px;
 }
 
