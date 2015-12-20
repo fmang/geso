@@ -11,7 +11,7 @@ package Geso::Player;
 
 use IO::Handle;
 use String::ShellQuote qw(shell_quote);
-use POSIX;
+use POSIX ":sys_wait_h";
 
 use constant {
 	OFF => 'Off',
@@ -180,9 +180,9 @@ sub parse {
 package Geso::YouTube;
 
 use File::Spec::Functions;
-use LWP::UserAgent;
+use LWP::UserAgent ();
 use URI::Escape qw(uri_escape);
-use POSIX;
+use POSIX ":sys_wait_h";
 
 use constant {
 	DOWNLOADING => 'Downloading',
@@ -249,12 +249,12 @@ sub search {
 package Geso::HTML;
 
 use CGI qw(escapeHTML);
-use File::Find;
 use File::Spec::Functions;
 use URI::Escape qw(uri_escape);
 
 sub header {
 	my $title = shift;
+	print CGI::header(-type => 'text/html', -charset => 'utf-8', @_);
 	$title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
 	print <<"EOF";
 <!doctype html>
@@ -265,15 +265,18 @@ sub header {
 		<meta name="robots" content="noindex, nofollow" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script>
-			function playpause() {
+			function update(info) {
+				document.getElementById("status").innerHTML = info.status;
+			}
+			function call(url) {
 				var req = new XMLHttpRequest();
 				req.onreadystatechange = function () {
 					if (req.readyState == 4 && req.status == 200) {
 						var result = JSON.parse(req.responseText);
-						document.getElementById("status").innerHTML = result.status;
+						update(result);
 					}
 				}
-				req.open("GET", "/playpause?api=1");
+				req.open("GET", url);
 				req.send();
 			}
 		</script>
@@ -290,7 +293,7 @@ sub status {
 	print <<"EOF";
 	<h2>Actions</h2>
 	<ul>
-		<li><a href="/playpause" onclick="playpause(); event.preventDefault();">Play / Pause</a></li>
+		<li><a href="/playpause" onclick="call('/playpause?api=json'); event.preventDefault();">Play / Pause</a></li>
 		<li><a href="/stop">Stop</a></li>
 		<li><a href="/seek?time=-600">Seek -10m</a></li>
 		<li><a href="/seek?time=-30">Seek -30s</a></li>
@@ -337,12 +340,22 @@ sub traverse {
 
 package Geso::Pages;
 
-use CGI qw(:standard);
+use CGI qw(escapeHTML);
 use File::Spec::Functions;
 use URI::Escape qw(uri_escape);
 
+sub forbidden {
+	my ($msg) = @_;
+	print CGI::header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
+	print "403 Forbidden\n$msg";
+}
+
+sub api_status {
+	print CGI::header(-type => 'application/json', -charset => 'utf-8');
+	print "{ \"status\": \"$Geso::Player::state{status}\" }";
+}
+
 sub status {
-	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('Status');
 	print '<h2>YouTube</h2><ul>';
 	foreach (keys %Geso::YouTube::downloads) {
@@ -371,7 +384,6 @@ EOF
 }
 
 sub library {
-	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('Library');
 	print '<h2>Library</h2>';
 	my $root = $ENV{DOCUMENT_ROOT};
@@ -386,64 +398,58 @@ sub playpause {
 	} else {
 		Geso::Player::playpause();
 	}
-	if (param('api')) {
-		print header(-type => 'application/json', -charset => 'utf-8');
-		print "{ \"status\": \"$Geso::Player::state{status}\" }";
+	if (CGI::param('api')) {
+		api_status();
 	} else {
-		print redirect('/');
+		print CGI::redirect('/');
 	}
 }
 
 sub stop {
 	Geso::Player::stop();
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 sub spawn {
 	# http://www.perlmonks.org/?node=Sanitizing%20user-provided%20path%2Ffilenames
-	my $file = param('file');
+	my $file = CGI::param('file');
 	my $root = $ENV{DOCUMENT_ROOT};
 	my $abs = File::Spec->rel2abs($file, $root);
 	if ($abs =~ /^\Q$root/) {
 		my $root = $ENV{DOCUMENT_ROOT};
 		Geso::Player::spawn(catfile($root, $file));
-		print redirect('/');
+		print CGI::redirect('/');
 	} else {
-		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
-		print "403 Forbidden\nShady path.\n";
+		forbidden("Shady path.\n");
 	}
 }
 
 sub seek {
-	my $time = param('time');
+	my $time = CGI::param('time');
 	if ($time =~ /^[-+]?[0-9]+$/) {
 		Geso::Player::seek($time);
-		print redirect('/');
+		print CGI::redirect('/');
 	} else {
-		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
-		print "403 Forbidden\nInvalid time $time.\n";
+		forbidden("Invalid time $time.\n");
 	}
 }
 
 sub chapter {
-	my $seek = param('seek');
+	my $seek = CGI::param('seek');
 	if ($Geso::Player::state{status} ne Geso::Player::OFF) {
 		if ($seek eq 'next') {
 			Geso::Player::command('o');
 		} elsif ($seek eq 'previous') {
 			Geso::Player::command('i');
 		} else {
-			print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
-			print "403 Forbidden\nInvalid direction.\n";
-			return;
+			return forbidden("Invalid direction.\n");
 		}
 	}
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 sub youtube_search {
-	my $query = param('q') or return print redirect('/');
-	print header(-type => 'text/html', -charset => 'utf-8');
+	my $query = CGI::param('q') or return print CGI::redirect('/');
 	Geso::HTML::header('YouTube search');
 	print '<h2>YouTube results</h2>';
 	print '<ul>';
@@ -460,33 +466,33 @@ sub youtube_search {
 }
 
 sub youtube_cancel {
-	my $id = param('v');
+	my $id = CGI::param('v');
 	Geso::YouTube::cancel($id) if $id;
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 sub youtube_clear {
-	my $id = param('v');
+	my $id = CGI::param('v');
 	Geso::YouTube::clear($id) if $id;
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 sub youtube_download {
-	my $id = param('v');
-	my $name = param('name');
+	my $id = CGI::param('v');
+	my $name = CGI::param('name');
 	my $dl = $Geso::YouTube::downloads{$id};
 	if (!$name && $dl) {
 		$name = $dl->{name};
 	}
 	Geso::YouTube::download($id, $name) if $id and $name;
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 sub youtube_play {
-	my $id = param('v');
+	my $id = CGI::param('v');
 	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
 	Geso::Player::spawn($file) if $file;
-	print redirect('/');
+	print CGI::redirect('/');
 }
 
 my %pages = (
@@ -505,12 +511,12 @@ my %pages = (
 );
 
 sub route {
-	my $url = url(-absolute => 1);
+	my $url = CGI::url(-absolute => 1);
 	my $page = $pages{$url};
 	if ($page) {
 		$page->();
 	} else {
-		print header(-type => 'text/plain', -charset => 'utf-8', -status => '404 Not Found');
+		print CGI::header(-type => 'text/plain', -charset => 'utf-8', -status => '404 Not Found');
 		print "404 Not Found\n";
 	}
 }
@@ -520,7 +526,7 @@ sub route {
 
 package main;
 
-use CGI::Fast;
+use CGI::Fast ();
 
 while (new CGI::Fast) {
 	Geso::Player::update();
