@@ -273,6 +273,7 @@ sub header {
 		<script>
 			function update(info) {
 				document.getElementById("status").innerHTML = info.status;
+				document.getElementById("file").innerHTML = info.file;
 			}
 			function call(url) {
 				var req = new XMLHttpRequest();
@@ -294,20 +295,21 @@ EOF
 
 sub status {
 	print "<h2>Status: <span id=\"status\">$Geso::Player::state{status}</span></h2>";
-	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
-	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
+	print '<div id="file">';
+	print escapeHTML($Geso::Player::state{file}) if $Geso::Player::state{file};
+	print '</div>';
 	print <<"EOF";
 	<h2>Actions</h2>
 	<ul>
 		<li><a href="/play" onclick="call('/play?api=json'); event.preventDefault();">Play</a></li>
 		<li><a href="/pause" onclick="call('/pause?api=json'); event.preventDefault();">Pause</a></li>
-		<li><a href="/stop">Stop</a></li>
-		<li><a href="/seek?time=-600">Seek -10m</a></li>
-		<li><a href="/seek?time=-30">Seek -30s</a></li>
-		<li><a href="/seek?time=30">Seek +30s</a></li>
-		<li><a href="/seek?time=600">Seek +10m</a></li>
-		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
-		<li><a href="/chapter?seek=next">Next chapter</a></li>
+		<li><a href="/stop" onclick="call('/stop?api=json'); event.preventDefault();">Stop</a></li>
+		<li><a href="/seek?time=-600" onclick="call('/seek?time=-600&amp;api=json'); event.preventDefault();">Seek -10m</a></li>
+		<li><a href="/seek?time=-30" onclick="call('/seek?time=-30&amp;api=json'); event.preventDefault();">Seek -30s</a></li>
+		<li><a href="/seek?time=30" onclick="call('/seek?time=30&amp;api=json'); event.preventDefault();">Seek +30s</a></li>
+		<li><a href="/seek?time=600" onclick="call('/seek?time=600&amp;api=json'); event.preventDefault();">Seek +10m</a></li>
+		<li><a href="/chapter?seek=previous" onclick="call('/chapter?seek=previous&amp;api=json'); event.preventDefault();">Previous chapter</a></li>
+		<li><a href="/chapter?seek=next" onclick="call('/chapter?seek=next&amp;api=json'); event.preventDefault();">Next chapter</a></li>
 	</ul>
 	<h2>Menu</h2>
 	<ul>
@@ -343,9 +345,9 @@ sub traverse {
 			traverse($root, catdir($base, $_));
 			print '</li>';
 		} elsif (-f $path) {
-			print '<li><a href="/spawn?file='
-			    . escapeHTML(uri_escape(catfile($base, $_)))
-			    . '">' . escapeHTML($_) . '</a></li>';
+			my $url = '/spawn?file=' . escapeHTML(uri_escape(catfile($base, $_)));
+			print "<li><a href=\"/spawn?file=$url\" onclick=\"call('$url&amp;api=json'); event.preventDefault();\">"
+			    . escapeHTML($_) . '</a></li>';
 		}
 	}
 	print '</ul>';
@@ -353,13 +355,12 @@ sub traverse {
 }
 
 #-------------------------------------------------------------------------------
-# Pages
+# Actions
 
-package Geso::Pages;
+package Geso::Actions;
 
-use CGI qw(escapeHTML);
 use File::Spec::Functions;
-use URI::Escape qw(uri_escape);
+use JSON;
 
 sub forbidden {
 	my ($msg) = @_;
@@ -369,33 +370,10 @@ sub forbidden {
 
 sub api_status {
 	print CGI::header(-type => 'application/json', -charset => 'utf-8');
-	print "{ \"status\": \"$Geso::Player::state{status}\" }";
-}
-
-sub status {
-	Geso::HTML::header('Status');
-	print '<h2>YouTube</h2><ul>';
-	foreach (keys %Geso::YouTube::downloads) {
-		my $dl = $Geso::YouTube::downloads{$_};
-		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
-		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
-		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
-		print " <a href=\"/youtube/play?v=$_\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
-		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
-		print '</li>';
-	}
-	print <<"EOF";
-	</ul>
-EOF
-	Geso::HTML::footer();
-}
-
-sub library {
-	Geso::HTML::header('Library');
-	print '<h2>Library</h2>';
-	my $root = $ENV{DOCUMENT_ROOT};
-	Geso::HTML::traverse($root, '.');
-	Geso::HTML::footer();
+	print to_json {
+		status => $Geso::Player::state{status},
+		file => $Geso::Player::state{file},
+	};
 }
 
 sub feedback {
@@ -423,7 +401,7 @@ sub pause {
 
 sub stop {
 	Geso::Player::stop();
-	print CGI::redirect('/');
+	feedback();
 }
 
 sub spawn {
@@ -434,7 +412,7 @@ sub spawn {
 	if ($abs =~ /^\Q$root/) {
 		my $root = $ENV{DOCUMENT_ROOT};
 		Geso::Player::spawn(catfile($root, $file));
-		print CGI::redirect('/');
+		feedback();
 	} else {
 		forbidden("Shady path.\n");
 	}
@@ -444,7 +422,7 @@ sub seek {
 	my $time = CGI::param('time');
 	if ($time =~ /^[-+]?[0-9]+$/) {
 		Geso::Player::seek($time);
-		print CGI::redirect('/');
+		feedback();
 	} else {
 		forbidden("Invalid time $time.\n");
 	}
@@ -461,7 +439,71 @@ sub chapter {
 			return forbidden("Invalid direction.\n");
 		}
 	}
-	print CGI::redirect('/');
+	feedback();
+}
+
+sub youtube_cancel {
+	my $id = CGI::param('v');
+	Geso::YouTube::cancel($id) if $id;
+	feedback();
+}
+
+sub youtube_clear {
+	my $id = CGI::param('v');
+	Geso::YouTube::clear($id) if $id;
+	feedback();
+}
+
+sub youtube_download {
+	my $id = CGI::param('v');
+	my $name = CGI::param('name');
+	my $dl = $Geso::YouTube::downloads{$id};
+	if (!$name && $dl) {
+		$name = $dl->{name};
+	}
+	Geso::YouTube::download($id, $name) if $id and $name;
+	feedback();
+}
+
+sub youtube_play {
+	my $id = CGI::param('v');
+	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
+	Geso::Player::spawn($file) if $file;
+	feedback();
+}
+
+#-------------------------------------------------------------------------------
+# Pages
+
+package Geso::Pages;
+
+use CGI qw(escapeHTML);
+use URI::Escape qw(uri_escape);
+
+sub status {
+	Geso::HTML::header('Status');
+	print '<h2>YouTube</h2><ul>';
+	foreach (keys %Geso::YouTube::downloads) {
+		my $dl = $Geso::YouTube::downloads{$_};
+		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
+		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
+		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
+		print " <a href=\"/youtube/play?v=$_\" onclick=\"call('/youtube/play?v=$_&amp;api=json'); event.preventDefault();\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
+		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
+		print '</li>';
+	}
+	print <<"EOF";
+	</ul>
+EOF
+	Geso::HTML::footer();
+}
+
+sub library {
+	Geso::HTML::header('Library');
+	print '<h2>Library</h2>';
+	my $root = $ENV{DOCUMENT_ROOT};
+	Geso::HTML::traverse($root, '.');
+	Geso::HTML::footer();
 }
 
 sub youtube_search {
@@ -481,50 +523,28 @@ sub youtube_search {
 	print '</ul>';
 }
 
-sub youtube_cancel {
-	my $id = CGI::param('v');
-	Geso::YouTube::cancel($id) if $id;
-	print CGI::redirect('/');
-}
+#-------------------------------------------------------------------------------
+# Main
 
-sub youtube_clear {
-	my $id = CGI::param('v');
-	Geso::YouTube::clear($id) if $id;
-	print CGI::redirect('/');
-}
+package main;
 
-sub youtube_download {
-	my $id = CGI::param('v');
-	my $name = CGI::param('name');
-	my $dl = $Geso::YouTube::downloads{$id};
-	if (!$name && $dl) {
-		$name = $dl->{name};
-	}
-	Geso::YouTube::download($id, $name) if $id and $name;
-	print CGI::redirect('/');
-}
-
-sub youtube_play {
-	my $id = CGI::param('v');
-	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
-	Geso::Player::spawn($file) if $file;
-	print CGI::redirect('/');
-}
+use CGI ();
+use CGI::Fast ();
 
 my %pages = (
-	'/' => \&status,
-	'/play' => \&play,
-	'/pause' => \&pause,
-	'/stop' => \&stop,
-	'/spawn' => \&spawn,
-	'/seek' => \&seek,
-	'/chapter' => \&chapter,
-	'/library' => \&library,
-	'/youtube/search' => \&youtube_search,
-	'/youtube/cancel' => \&youtube_cancel,
-	'/youtube/clear' => \&youtube_clear,
-	'/youtube/download' => \&youtube_download,
-	'/youtube/play' => \&youtube_play,
+	'/' => \&Geso::Pages::status,
+	'/library' => \&Geso::Pages::library,
+	'/play' => \&Geso::Actions::play,
+	'/pause' => \&Geso::Actions::pause,
+	'/stop' => \&Geso::Actions::stop,
+	'/spawn' => \&Geso::Actions::spawn,
+	'/seek' => \&Geso::Actions::seek,
+	'/chapter' => \&Geso::Actions::chapter,
+	'/youtube/search' => \&Geso::Pages::youtube_search,
+	'/youtube/cancel' => \&Geso::Actions::youtube_cancel,
+	'/youtube/clear' => \&Geso::Actions::youtube_clear,
+	'/youtube/download' => \&Geso::Actions::youtube_download,
+	'/youtube/play' => \&Geso::Actions::youtube_play,
 );
 
 sub route {
@@ -538,15 +558,8 @@ sub route {
 	}
 }
 
-#-------------------------------------------------------------------------------
-# Main
-
-package main;
-
-use CGI::Fast ();
-
 while (new CGI::Fast) {
 	Geso::Player::update();
 	Geso::YouTube::update();
-	Geso::Pages::route();
+	route();
 }
