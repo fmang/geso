@@ -4,17 +4,14 @@ use strict;
 use warnings;
 use utf8;
 
-use CGI qw(:standard);
-use CGI::Fast;
-use File::Find;
-use File::Spec::Functions;
-use IO::Handle;
-use String::ShellQuote qw(shell_quote);
-use URI::Escape qw(uri_escape);
-use POSIX;
-
 #-------------------------------------------------------------------------------
 # Player
+
+package Geso::Player;
+
+use IO::Handle;
+use String::ShellQuote qw(shell_quote);
+use POSIX;
 
 use constant {
 	OFF => 'Off',
@@ -22,71 +19,76 @@ use constant {
 	PAUSED => 'Paused',
 };
 
-my %player = (
+our %state = (
 	status => OFF
 );
 
-sub command_player {
-	return if $player{status} eq OFF;
-	my $fh = $player{in};
+sub command {
+	return if $state{status} eq OFF;
+	my $fh = $state{in};
 	print $fh shift;
 	$fh->flush();
 }
 
-sub reset_player {
-	close $player{in};
-	$player{status} = OFF;
-	delete $player{pid};
+sub reset_state {
+	close $state{in};
+	$state{status} = OFF;
+	delete $state{pid};
 }
 
-sub spawn_player {
-	kill_player() if $player{status} ne OFF;
+sub spawn {
+	stop() if $state{status} ne OFF;
 	my $arg = shift;
-	$player{file} = $arg;
+	$state{file} = $arg;
 	if ($arg =~ /^-/) { $arg = "./$arg"; }
-	$player{pid} = open($player{in}, '|-', shell_quote('omxplayer', $arg));
-	$player{status} = PLAYING;
+	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', $arg));
+	$state{status} = PLAYING;
 }
 
-sub update_player {
-	return if $player{status} eq OFF;
-	my $kid = waitpid($player{pid}, WNOHANG);
-	reset_player() if $kid > 0;
+sub update {
+	return if $state{status} eq OFF;
+	my $kid = waitpid($state{pid}, WNOHANG);
+	reset_state() if $kid > 0;
 }
 
-sub kill_player {
-	return if $player{status} eq OFF;
-	command_player('q');
-	my $kid = waitpid($player{pid}, 0);
-	reset_player() if $kid > 0;
+sub stop {
+	return if $state{status} eq OFF;
+	command('q');
+	my $kid = waitpid($state{pid}, 0);
+	reset_state() if $kid > 0;
 }
 
-sub playpause_player {
-	return if $player{status} eq OFF;
-	command_player(' ');
-	$player{status} = $player{status} eq PLAYING ? PAUSED : PLAYING;
+sub playpause {
+	return if $state{status} eq OFF;
+	command(' ');
+	$state{status} = $state{status} eq PLAYING ? PAUSED : PLAYING;
 }
 
-sub seek_player {
-	return if $player{status} eq OFF;
+sub seek {
+	return if $state{status} eq OFF;
 	use integer;
 	my $time = shift;
 	my $abstime = abs($time);
 	my $big_steps = $abstime / 600;
 	my $small_steps = ($abstime % 600) / 30;
 	if ($time >= 30) {
-		command_player(("\027[A" x $big_steps) . ("\027[C" x $small_steps));
+		command(("\027[A" x $big_steps) . ("\027[C" x $small_steps));
 	} elsif ($time <= -30) {
-		command_player(("\027[B" x $big_steps) . ("\027[D" x $small_steps));
+		command(("\027[B" x $big_steps) . ("\027[D" x $small_steps));
 	}
 }
 
 #-------------------------------------------------------------------------------
 # YouTube
 
+package Geso::YouTube;
+
+use File::Spec::Functions;
+use POSIX;
+
 my %youtube_dls = ();
 
-sub download_youtube {
+sub download {
 	my ($id, $name) = shift;
 	if (my $pid = fork()) {
 		$youtube_dls{$pid} = $name or $id;
@@ -96,22 +98,29 @@ sub download_youtube {
 	}
 }
 
-sub update_youtube {
+sub update {
 	foreach (keys %youtube_dls) {
-		my $kid = waitpid($player{$_}, WNOHANG);
+		my $kid = waitpid($youtube_dls{$_}, WNOHANG);
 		delete $youtube_dls{$_} if $kid > 0;
 	}
 }
 
-sub search_youtube {
+sub search {
 	my $query = shift;
 	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
 }
 
 #-------------------------------------------------------------------------------
-# Pages
+# HTML
 
-sub html_header {
+package Geso::HTML;
+
+use CGI qw(escapeHTML);
+use File::Find;
+use File::Spec::Functions;
+use URI::Escape qw(uri_escape);
+
+sub header {
 	my $title = shift;
 	$title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
 	print <<"EOF";
@@ -127,7 +136,7 @@ sub html_header {
 EOF
 }
 
-sub html_footer {
+sub footer {
 	print<<EOF;
 	</body>
 </html>
@@ -156,12 +165,20 @@ sub traverse {
 
 }
 
-sub status_page {
+#-------------------------------------------------------------------------------
+# Pages
+
+package Geso::Pages;
+
+use CGI qw(:standard);
+use File::Spec::Functions;
+
+sub status {
 	print header(-type => 'text/html', -charset => 'utf-8');
-	html_header('Status');
-	print "<h2>Status: $player{status}</h2>";
-	print escapeHTML($player{file}) . "<br />" if $player{file};
-	print "PID " . $player{pid} . "<br />" if $player{pid};
+	Geso::HTML::header('Status');
+	print "<h2>Status: $Geso::Player::state{status}</h2>";
+	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
+	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
 	print <<"EOF";
 	<h2>Actions</h2>
 	<ul>
@@ -177,8 +194,8 @@ sub status_page {
 	<h2>YouTube</h2>
 	<ul>
 EOF
-	foreach (keys %youtube_dls) {
-		print "<li>$_ - " . escapeHTML($youtube_dls{$_}) . '</li>';
+	foreach (keys %Geso::YouTube::youtube_dls) {
+		print "<li>$_ - " . escapeHTML($Geso::YouTube::youtube_dls{$_}) . '</li>';
 	}
 	print <<"EOF";
 	</ul>
@@ -193,36 +210,36 @@ EOF
 		</li>
 	</ul>
 EOF
-	html_footer();
+	Geso::HTML::footer();
 }
 
-sub library_page {
+sub library {
 	print header(-type => 'text/html', -charset => 'utf-8');
-	html_header('Library');
+	Geso::HTML::header('Library');
 	print '<h2>Library</h2>';
 	my $root = $ENV{DOCUMENT_ROOT};
-	traverse($root, '.');
-	html_footer();
+	Geso::HTML::traverse($root, '.');
+	Geso::HTML::footer();
 }
 
-sub playpause_page {
-	playpause_player();
+sub playpause {
+	Geso::Player::playpause();
 	print redirect('/');
 }
 
-sub stop_page {
-	kill_player();
+sub stop {
+	Geso::Player::stop();
 	print redirect('/');
 }
 
-sub spawn_page {
+sub spawn {
 	# http://www.perlmonks.org/?node=Sanitizing%20user-provided%20path%2Ffilenames
 	my $file = param('file');
 	my $root = $ENV{DOCUMENT_ROOT};
 	my $abs = File::Spec->rel2abs($file, $root);
 	if ($abs =~ /^\Q$root/) {
 		my $root = $ENV{DOCUMENT_ROOT};
-		spawn_player(catfile($root, $file));
+		Geso::Player::spawn(catfile($root, $file));
 		print redirect('/');
 	} else {
 		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
@@ -230,10 +247,10 @@ sub spawn_page {
 	}
 }
 
-sub seek_page {
+sub seek {
 	my $time = param('time');
 	if ($time =~ /^[-+]?[0-9]+$/) {
-		seek_player($time);
+		Geso::Player::seek($time);
 		print redirect('/');
 	} else {
 		print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
@@ -241,13 +258,13 @@ sub seek_page {
 	}
 }
 
-sub chapter_page {
+sub chapter {
 	my $seek = param('seek');
-	if ($player{status} ne OFF) {
+	if ($Geso::Player::state{status} ne Geso::Player::OFF) {
 		if ($seek eq 'next') {
-			command_player('o');
+			Geso::Player::command('o');
 		} elsif ($seek eq 'previous') {
-			command_player('i');
+			Geso::Player::command('i');
 		} else {
 			print header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
 			print "403 Forbidden\nInvalid direction.\n";
@@ -257,26 +274,24 @@ sub chapter_page {
 	print redirect('/');
 }
 
-sub youtube_page {
+sub youtube {
 	my $query = param('q');
 	return if not $query;
 
 }
 
 my %pages = (
-	'/' => \&status_page,
-	'/playpause' => \&playpause_page,
-	'/stop' => \&stop_page,
-	'/spawn' => \&spawn_page,
-	'/seek' => \&seek_page,
-	'/chapter' => \&chapter_page,
-	'/library' => \&library_page,
-	'/youtube' => \&youtube_page,
+	'/' => \&status,
+	'/playpause' => \&playpause,
+	'/stop' => \&stop,
+	'/spawn' => \&spawn,
+	'/seek' => \&seek,
+	'/chapter' => \&chapter,
+	'/library' => \&library,
+	'/youtube' => \&youtube,
 );
 
-while (new CGI::Fast) {
-	update_player();
-	update_youtube();
+sub route {
 	my $url = url(-absolute => 1);
 	my $page = $pages{$url};
 	if ($page) {
@@ -285,4 +300,17 @@ while (new CGI::Fast) {
 		print header(-type => 'text/plain', -charset => 'utf-8', -status => '404 Not Found');
 		print "404 Not Found\n";
 	}
+}
+
+#-------------------------------------------------------------------------------
+# Main
+
+package main;
+
+use CGI::Fast;
+
+while (new CGI::Fast) {
+	Geso::Player::update();
+	Geso::YouTube::update();
+	Geso::Pages::route();
 }
