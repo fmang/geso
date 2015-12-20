@@ -235,7 +235,9 @@ sub traverse {
 	print '<ul>';
 	my ($root, $base) = @_;
 	opendir(my $dh, catdir($root, $base));
-	foreach (sort readdir($dh)) {
+	my @entries = sort readdir($dh);
+	closedir($dh);
+	foreach (@entries) {
 		next if /^\./;
 		my $path = catfile($root, $base, $_);
 		if (-d $path) {
@@ -248,7 +250,6 @@ sub traverse {
 			    . '">' . escapeHTML($_) . '</a></li>';
 		}
 	}
-	closedir($dh);
 	print '</ul>';
 
 }
