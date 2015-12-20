@@ -364,7 +364,12 @@ sub library {
 }
 
 sub playpause {
-	Geso::Player::playpause();
+	if ($Geso::Player::state{status} eq Geso::Player::OFF) {
+		my $f = $Geso::Player::state{file};
+		Geso::Player::spawn($f) if $f;
+	} else {
+		Geso::Player::playpause();
+	}
 	print redirect('/');
 }
 
