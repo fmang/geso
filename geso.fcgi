@@ -90,7 +90,9 @@ use constant {
 	TIME => 1,
 	TITLE => 2,
 	USER => 3,
-	META => 4,
+	USERNAME => 4,
+	META => 5,
+	DESCRIPTION => 6,
 };
 
 my $location = OUT;
@@ -104,12 +106,14 @@ sub start {
 	if ($location eq OUT) {
 		if ($class eq 'video-time') {
 			$location = TIME;
-		} elsif ($class =~ 'yt-lockup-title ') {
+		} elsif ($class eq 'yt-lockup-title ') {
 			$location = TITLE;
-		} elsif ($class =~ 'yt-lockup-byline') {
+		} elsif ($class eq 'yt-lockup-byline') {
 			$location = USER;
-		} elsif ($class =~ 'yt-lockup-meta-info') {
+		} elsif ($class eq 'yt-lockup-meta-info') {
 			$location = META;
+		} elsif ($class eq 'yt-lockup-description yt-ui-ellipsis yt-ui-ellipsis-2') {
+			$location = DESCRIPTION;
 		}
 	} elsif ($tagname eq 'a') {
 		my $href = $attr->{href};
@@ -122,9 +126,7 @@ sub start {
 				$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg"
 			}
 		} elsif ($location eq USER) {
-			if ($href =~ /^\/user\/([^\/]+)/) {
-				$video->{user} = $1;
-			}
+			$location = USERNAME;
 		}
 	}
 }
@@ -134,7 +136,7 @@ sub end {
 	if ($location eq META && $tagname eq 'li') {
 		# move on to the next element, duration
 	} else {
-		commit() if $location eq META;
+		commit() if $location eq DESCRIPTION;
 		$location = OUT;
 	}
 }
@@ -148,6 +150,10 @@ sub text {
 			my @seqs = $text =~ /([0-9]+)/g;
 			$video->{views} = join('', @seqs);
 		}
+	} elsif ($location eq DESCRIPTION) {
+		$video->{description} = $video->{description} ? $video->{description} . $text : $text;
+	} elsif ($location eq USERNAME) {
+		$video->{user} = $text;
 	}
 }
 
@@ -416,12 +422,13 @@ sub youtube_search {
 	print '<h2>YouTube results</h2>';
 	print '<ul>';
 	foreach (Geso::YouTube::search($query)) {
-		print '<li>'
-		. "<img src=\"$_->{thumbnail}\" />"
-		. "<a href=\"/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title})) . '">'
-		. escapeHTML($_->{title}) . '</a> '
-		. escapeHTML("($_->{time}, $_->{views} views) by $_->{user}.")
-		. '</li>';
+		print '<li>';
+		print "<img src=\"$_->{thumbnail}\" />";
+		print "<a href=\"/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title})) . '">';
+		print escapeHTML($_->{title}) . '</a> ';
+		print escapeHTML("($_->{time}, $_->{views} views) by $_->{user}.");
+		print '<br />' . $_->{description};
+		print '</li>';
 	}
 	print '</ul>';
 }
