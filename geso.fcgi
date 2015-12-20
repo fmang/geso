@@ -143,8 +143,9 @@ sub text {
 	if ($location eq TIME) {
 		$video->{time} = $text;
 	} elsif ($location eq META) {
-		if ($text =~ /^([0-9][^ ]*)/) {
-			$video->{views} = $1;
+		if ($text =~ /^[0-9]/) {
+			my @seqs = $text =~ /([0-9]+)/g;
+			$video->{views} = join('', @seqs);
 		}
 	}
 }
@@ -163,7 +164,7 @@ sub parse {
 		text_h => [\&text, 'text'],
 	);
 	$p->unbroken_text(1);
-	$p->parse_file($in);
+	$p->parse($in);
 	my $result = $videos;
 	$videos = [];
 	return @$result;
@@ -172,6 +173,8 @@ sub parse {
 package Geso::YouTube;
 
 use File::Spec::Functions;
+use LWP::UserAgent;
+use URI::Escape qw(uri_escape);
 use POSIX;
 
 my %youtube_dls = ();
@@ -196,6 +199,11 @@ sub update {
 sub search {
 	my $query = shift;
 	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
+	my $ua = LWP::UserAgent->new;
+	my $res = $ua->get($url);
+	if ($res->is_success && $res->code == 200) {
+		return Geso::YouTube::Parser::parse($res->decoded_content);
+	}
 }
 
 #-------------------------------------------------------------------------------
@@ -204,13 +212,18 @@ sub search {
 package Geso::HTML;
 
 use CGI qw(escapeHTML);
+use Encode qw(encode_utf8);
 use File::Find;
 use File::Spec::Functions;
 use URI::Escape qw(uri_escape);
 
+sub escape {
+	return escapeHTML(encode_utf8(shift));
+}
+
 sub header {
 	my $title = shift;
-	$title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
+	$title = $title ? escape($title) . ' - Geso' : 'Geso';
 	print <<"EOF";
 <!doctype html>
 <html>
@@ -241,13 +254,13 @@ sub traverse {
 		next if /^\./;
 		my $path = catfile($root, $base, $_);
 		if (-d $path) {
-			print '<li><span>' . escapeHTML($_) . '</span>';
+			print '<li><span>' . escape($_) . '</span>';
 			traverse($root, catdir($base, $_));
 			print '</li>';
 		} elsif (-f $path) {
 			print '<li><a href="/spawn?file='
-			    . escapeHTML(uri_escape(catfile($base, $_)))
-			    . '">' . escapeHTML($_) . '</a></li>';
+			    . escape(uri_escape(catfile($base, $_)))
+			    . '">' . escape($_) . '</a></li>';
 		}
 	}
 	print '</ul>';
@@ -266,7 +279,7 @@ sub status {
 	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('Status');
 	print "<h2>Status: $Geso::Player::state{status}</h2>";
-	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
+	print Geso::HTML::escape($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
 	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
 	print <<"EOF";
 	<h2>Actions</h2>
@@ -284,7 +297,7 @@ sub status {
 	<ul>
 EOF
 	foreach (keys %Geso::YouTube::youtube_dls) {
-		print "<li>$_ - " . escapeHTML($Geso::YouTube::youtube_dls{$_}) . '</li>';
+		print "<li>$_ - " . Geso::HTML::escape($Geso::YouTube::youtube_dls{$_}) . '</li>';
 	}
 	print <<"EOF";
 	</ul>
@@ -365,8 +378,17 @@ sub chapter {
 
 sub youtube {
 	my $query = param('q');
-	return if not $query;
-
+	return print redirect('/') if not $query;
+	print header(-type => 'text/html', -charset => 'utf-8');
+	Geso::HTML::header('YouTube search');
+	print '<h2>YouTube results</h2>';
+	print '<ul>';
+	foreach (Geso::YouTube::search($query)) {
+		print '<li>';
+		print Geso::HTML::escape("$_->{id}: $_->{title} ($_->{time}, by $_->{user}, $_->{views} views)");
+		print '</li>';
+	}
+	print '</ul>';
 }
 
 my %pages = (
