@@ -264,8 +264,41 @@ sub header {
 		<meta charset="utf-8" />
 		<meta name="robots" content="noindex, nofollow" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			function playpause() {
+				var req = new XMLHttpRequest();
+				req.onreadystatechange = function () {
+					if (req.readyState == 4 && req.status == 200) {
+						var result = JSON.parse(req.responseText);
+						document.getElementById("status").innerHTML = result.status;
+					}
+				}
+				req.open("GET", "/playpause?api=1");
+				req.send();
+			}
+		</script>
 	</head>
 	<body>
+EOF
+	status();
+}
+
+sub status {
+	print "<h2>Status: <span id=\"status\">$Geso::Player::state{status}</span></h2>";
+	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
+	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
+	print <<"EOF";
+	<h2>Actions</h2>
+	<ul>
+		<li><a href="/playpause" onclick="playpause(); event.preventDefault();">Play / Pause</a></li>
+		<li><a href="/stop">Stop</a></li>
+		<li><a href="/seek?time=-600">Seek -10m</a></li>
+		<li><a href="/seek?time=-30">Seek -30s</a></li>
+		<li><a href="/seek?time=30">Seek +30s</a></li>
+		<li><a href="/seek?time=600">Seek +10m</a></li>
+		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
+		<li><a href="/chapter?seek=next">Next chapter</a></li>
+	</ul>
 EOF
 }
 
@@ -311,24 +344,7 @@ use URI::Escape qw(uri_escape);
 sub status {
 	print header(-type => 'text/html', -charset => 'utf-8');
 	Geso::HTML::header('Status');
-	print "<h2>Status: $Geso::Player::state{status}</h2>";
-	print escapeHTML($Geso::Player::state{file}) . "<br />" if $Geso::Player::state{file};
-	print "PID " . $Geso::Player::state{pid} . "<br />" if $Geso::Player::state{pid};
-	print <<"EOF";
-	<h2>Actions</h2>
-	<ul>
-		<li><a href="/playpause">Play / Pause</a></li>
-		<li><a href="/stop">Stop</a></li>
-		<li><a href="/seek?time=-600">Seek -10m</a></li>
-		<li><a href="/seek?time=-30">Seek -30s</a></li>
-		<li><a href="/seek?time=30">Seek +30s</a></li>
-		<li><a href="/seek?time=600">Seek +10m</a></li>
-		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
-		<li><a href="/chapter?seek=next">Next chapter</a></li>
-	</ul>
-	<h2>YouTube</h2>
-	<ul>
-EOF
+	print '<h2>YouTube</h2><ul>';
 	foreach (keys %Geso::YouTube::downloads) {
 		my $dl = $Geso::YouTube::downloads{$_};
 		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
@@ -370,7 +386,12 @@ sub playpause {
 	} else {
 		Geso::Player::playpause();
 	}
-	print redirect('/');
+	if (param('api')) {
+		print header(-type => 'application/json', -charset => 'utf-8');
+		print "{ \"status\": \"$Geso::Player::state{status}\" }";
+	} else {
+		print redirect('/');
+	}
 }
 
 sub stop {
