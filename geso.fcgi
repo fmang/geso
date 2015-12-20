@@ -571,10 +571,10 @@ sub route {
 	}
 }
 
-my $lang = $ENV{LANG};
+my %base_env = %ENV;
 
 while (new CGI::Fast) {
-	$ENV{LANG} = $lang;
+	$ENV{$_} = $base_env{$_} foreach keys %base_env;
 	Geso::Player::update();
 	Geso::YouTube::update();
 	route();
