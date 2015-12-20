@@ -354,6 +354,7 @@ sub menu {
 	print <<"EOF";
 	<h2>Menu</h2>
 	<ul>
+		<li><a href="/">Status</a></li>
 		<li><a href="/library">Library</a></li>
 		<li>
 			<form action="/youtube/search">
