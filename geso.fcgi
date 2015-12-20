@@ -41,7 +41,7 @@ sub spawn {
 	my $arg = shift;
 	$state{file} = $arg;
 	if ($arg =~ /^-/) { $arg = "./$arg"; }
-	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', $arg));
+	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', $arg) . ' > /dev/null');
 	$state{status} = PLAYING;
 }
 
@@ -209,7 +209,7 @@ sub download {
 		$downloads{$id} = { pid => $pid, name => $name, status => DOWNLOADING };
 	} else {
 		my $output = catfile($ENV{DOCUMENT_ROOT}, 'youtube', '%(title)s.%(id)s.%(ext)s');
-		exec('youtube-dl', '--output', $output, '--', $id);
+		exec('youtube-dl', '--quiet', '--output', $output, '--', $id);
 	}
 }
 
