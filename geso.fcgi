@@ -571,7 +571,10 @@ sub route {
 	}
 }
 
+my $lang = $ENV{LANG};
+
 while (new CGI::Fast) {
+	$ENV{LANG} = $lang;
 	Geso::Player::update();
 	Geso::YouTube::update();
 	route();
