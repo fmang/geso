@@ -1,0 +1,79 @@
+/* Colors: http://colorpalettes.net/tag/sea-water-color/ */
+
+body {
+	color: #15222a;
+	background-color: #f4f1ea;
+}
+
+#state {
+	background-color: #255a62;
+	color: #f4f1ea;
+	font-size: 1.4em;
+}
+
+#state {
+	padding: 5px;
+}
+
+.status, .actions {
+	margin: 10px;
+}
+
+
+#status {
+	text-transform: capitalize;
+}
+
+#state #status { display: none; }
+
+#state.off #file:before { content: '◼ '; }
+#state.paused #file:before { content: '⏸ '; }
+#state.playing #file:before { content: '▶ '; }
+
+#state #file:before {
+	position: relative;
+	bottom: 2px;
+	padding-right: 7px;
+}
+
+#state #file:empty:after {
+	content: 'Nothing to play.';
+	font-style: italic;
+}
+
+.actions {
+	line-height: 1.5em;
+}
+
+.actions a {
+	color: #93cadf;
+	padding: 0 10px;
+}
+
+#state.off .actions a.on,
+#state.playing .actions a.play,
+#state.paused .actions a.pause {
+	color: #ccc;
+}
+
+.actions a span {
+	font-size: 0.8em;
+}
+
+.actions .section {
+	display: block;
+}
+
+.actions .section b {
+	font-size: 0.85em;
+	padding-right: 10px;
+}
+
+a {
+	color: #0390e8;
+	text-decoration: none;
+}
+
+a:focus {
+	color: #48b4a5;
+}

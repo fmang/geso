@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use locale;
+use utf8;
 
 #-------------------------------------------------------------------------------
 # Player
@@ -14,9 +15,9 @@ use String::ShellQuote qw(shell_quote);
 use POSIX ":sys_wait_h";
 
 use constant {
-	OFF => 'Off',
-	PLAYING => 'Playing',
-	PAUSED => 'Paused',
+	OFF => 'off',
+	PLAYING => 'playing',
+	PAUSED => 'paused',
 };
 
 our %state = (
@@ -191,10 +192,10 @@ use URI::Escape qw(uri_escape);
 use POSIX ":sys_wait_h";
 
 use constant {
-	DOWNLOADING => 'Downloading',
-	DONE => 'Done',
-	CANCELED => 'Canceled',
-	FAILED => 'Failed',
+	DOWNLOADING => 'downloading',
+	DONE => 'done',
+	CANCELED => 'canceled',
+	FAILED => 'failed',
 };
 
 our %downloads = ();
@@ -255,6 +256,7 @@ sub search {
 package Geso::HTML;
 
 use CGI qw(escapeHTML);
+use Encode qw(encode_utf8 decode_utf8);
 use File::Spec::Functions;
 use URI::Escape qw(uri_escape);
 
@@ -270,10 +272,12 @@ sub header {
 		<meta charset="utf-8" />
 		<meta name="robots" content="noindex, nofollow" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" type="text/css" href="/geso.css" />
 		<script>
 			function update(info) {
 				document.getElementById("status").innerHTML = info.status;
 				document.getElementById("file").innerHTML = info.file;
+				document.getElementById("state").className = info.status;
 			}
 			function call(url) {
 				var req = new XMLHttpRequest();
@@ -305,26 +309,51 @@ sub header {
 	<body onload="dynamize();">
 EOF
 	status();
+	menu();
 }
 
 sub status {
-	print "<h2>Status: <span id=\"status\">$Geso::Player::state{status}</span></h2>";
-	print '<div id="file">';
-	print escapeHTML($Geso::Player::state{file}) if $Geso::Player::state{file};
-	print '</div>';
+	my $file = $Geso::Player::state{file};
+	if ($file) {
+		$file = File::Spec->abs2rel($file, $ENV{DOCUMENT_ROOT});
+		$file = decode_utf8($file);
+		$file =~ s|/| » |g;
+		$file = escapeHTML($file);
+	} else {
+		$file = '';
+	}
+	print encode_utf8(<<"EOF");
+	<div id="state" class="$Geso::Player::state{status}">
+		<div class="status">
+			<span id="status">$Geso::Player::state{status}</span>
+			<span id="file">$file</span>
+		</div>
+		<div class="actions">
+			<span class="section">
+				<b>Play</b>
+				<a href="/play" class="api play" title="Play">▶</a>
+				<a href="/pause" class="api pause on" title="Pause">⏸</a>
+				<a href="/stop" class="api on" title="Stop">◼</a>
+			</span>
+			<span class="section">
+				<b>Seek</b>
+				<a href="/seek?time=-600" class="api on" title="Rewind 10 minutes">⏪ <span>10m</span></a>
+				<a href="/seek?time=-30" class="api on" title="Rewind 30 seconds">⏪ <span>30s</span></a>
+				<a href="/seek?time=30" class="api on" title="Forward 30 seconds">⏩ <span>30s</span></a>
+				<a href="/seek?time=600" class="api on" title="Forward 10 minutes">⏩ <span>10m</span></a>
+			</span>
+			<span class="section">
+				<b>Chapter</b>
+				<a href="/chapter?seek=previous" class="api on" title="Previous chapter">⏮</a>
+				<a href="/chapter?seek=next" class="api on" title="Next chapter">⏭</a>
+			</span>
+		</div>
+	</div>
+EOF
+}
+
+sub menu {
 	print <<"EOF";
-	<h2>Actions</h2>
-	<ul>
-		<li><a href="/play" class="api">Play</a></li>
-		<li><a href="/pause" class="api">Pause</a></li>
-		<li><a href="/stop" class="api">Stop</a></li>
-		<li><a href="/seek?time=-600" class="api">Seek -10m</a></li>
-		<li><a href="/seek?time=-30" class="api">Seek -30s</a></li>
-		<li><a href="/seek?time=30" class="api">Seek +30s</a></li>
-		<li><a href="/seek?time=600" class="api">Seek +10m</a></li>
-		<li><a href="/chapter?seek=previous" class="api">Previous chapter</a></li>
-		<li><a href="/chapter?seek=next" class="api">Next chapter</a></li>
-	</ul>
 	<h2>Menu</h2>
 	<ul>
 		<li><a href="/library">Library</a></li>
@@ -372,6 +401,7 @@ sub traverse {
 
 package Geso::Actions;
 
+use Encode qw(encode_utf8);
 use File::Spec::Functions;
 use JSON;
 
@@ -383,9 +413,15 @@ sub forbidden {
 
 sub api_status {
 	print CGI::header(-type => 'application/json', -charset => 'utf-8');
+	my $file = $Geso::Player::state{file};
+	if ($file) {
+		$file = File::Spec->abs2rel($file, $ENV{DOCUMENT_ROOT});
+		my $quote = encode_utf8(' » ');
+		$file =~ s|/|$quote|g;
+	}
 	print to_json {
 		status => $Geso::Player::state{status},
-		file => $Geso::Player::state{file},
+		file => $file,
 	};
 }
 
