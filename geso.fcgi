@@ -58,10 +58,16 @@ sub stop {
 	reset_state() if $kid > 0;
 }
 
-sub playpause {
+sub play {
 	return if $state{status} eq OFF;
-	command(' ');
-	$state{status} = $state{status} eq PLAYING ? PAUSED : PLAYING;
+	command(' ') if $state{status} eq PAUSED;
+	$state{status} = PLAYING;
+}
+
+sub pause {
+	return if $state{status} eq OFF;
+	command(' ') if $state{status} eq PLAYING;
+	$state{status} = PAUSED;
 }
 
 sub seek {
@@ -293,7 +299,8 @@ sub status {
 	print <<"EOF";
 	<h2>Actions</h2>
 	<ul>
-		<li><a href="/playpause" onclick="call('/playpause?api=json'); event.preventDefault();">Play / Pause</a></li>
+		<li><a href="/play" onclick="call('/play?api=json'); event.preventDefault();">Play</a></li>
+		<li><a href="/pause" onclick="call('/pause?api=json'); event.preventDefault();">Pause</a></li>
 		<li><a href="/stop">Stop</a></li>
 		<li><a href="/seek?time=-600">Seek -10m</a></li>
 		<li><a href="/seek?time=-30">Seek -30s</a></li>
@@ -301,6 +308,16 @@ sub status {
 		<li><a href="/seek?time=600">Seek +10m</a></li>
 		<li><a href="/chapter?seek=previous">Previous chapter</a></li>
 		<li><a href="/chapter?seek=next">Next chapter</a></li>
+	</ul>
+	<h2>Menu</h2>
+	<ul>
+		<li><a href="/library">Library</a></li>
+		<li>
+			<form action="/youtube/search">
+				<input name="q" />
+				<input type="submit" value="YouTube search" />
+			</form>
+		</li>
 	</ul>
 EOF
 }
@@ -369,16 +386,6 @@ sub status {
 	}
 	print <<"EOF";
 	</ul>
-	<h2>Menu</h2>
-	<ul>
-		<li><a href="/library">Library</a></li>
-		<li>
-			<form action="/youtube/search">
-				<input name="q" />
-				<input type="submit" value="YouTube search" />
-			</form>
-		</li>
-	</ul>
 EOF
 	Geso::HTML::footer();
 }
@@ -391,18 +398,27 @@ sub library {
 	Geso::HTML::footer();
 }
 
-sub playpause {
-	if ($Geso::Player::state{status} eq Geso::Player::OFF) {
-		my $f = $Geso::Player::state{file};
-		Geso::Player::spawn($f) if $f;
-	} else {
-		Geso::Player::playpause();
-	}
+sub feedback {
 	if (CGI::param('api')) {
 		api_status();
 	} else {
 		print CGI::redirect('/');
 	}
+}
+
+sub play {
+	if ($Geso::Player::state{status} eq Geso::Player::OFF) {
+		my $f = $Geso::Player::state{file};
+		Geso::Player::spawn($f) if $f;
+	} else {
+		Geso::Player::play();
+	}
+	feedback();
+}
+
+sub pause {
+	Geso::Player::pause();
+	feedback();
 }
 
 sub stop {
@@ -497,7 +513,8 @@ sub youtube_play {
 
 my %pages = (
 	'/' => \&status,
-	'/playpause' => \&playpause,
+	'/play' => \&play,
+	'/pause' => \&pause,
 	'/stop' => \&stop,
 	'/spawn' => \&spawn,
 	'/seek' => \&seek,
