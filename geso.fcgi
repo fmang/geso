@@ -277,7 +277,7 @@ sub header {
 			}
 			function call(url) {
 				var req = new XMLHttpRequest();
-				req.onreadystatechange = function () {
+				req.onreadystatechange = function() {
 					if (req.readyState == 4 && req.status == 200) {
 						var result = JSON.parse(req.responseText);
 						update(result);
@@ -286,9 +286,23 @@ sub header {
 				req.open("GET", url);
 				req.send();
 			}
+			function dynamize() {
+				var links = document.getElementsByClassName("api");
+				for (var i = 0; i < links.length; i++) {
+					links[i].onclick = function(e) {
+						var url = e.target.href;
+						if (url.indexOf("?") == -1)
+							url += "?api=json";
+						else
+							url += "&api=json";
+						call(url);
+						e.preventDefault();
+					}
+				}
+			}
 		</script>
 	</head>
-	<body>
+	<body onload="dynamize();">
 EOF
 	status();
 }
@@ -301,15 +315,15 @@ sub status {
 	print <<"EOF";
 	<h2>Actions</h2>
 	<ul>
-		<li><a href="/play" onclick="call('/play?api=json'); event.preventDefault();">Play</a></li>
-		<li><a href="/pause" onclick="call('/pause?api=json'); event.preventDefault();">Pause</a></li>
-		<li><a href="/stop" onclick="call('/stop?api=json'); event.preventDefault();">Stop</a></li>
-		<li><a href="/seek?time=-600" onclick="call('/seek?time=-600&amp;api=json'); event.preventDefault();">Seek -10m</a></li>
-		<li><a href="/seek?time=-30" onclick="call('/seek?time=-30&amp;api=json'); event.preventDefault();">Seek -30s</a></li>
-		<li><a href="/seek?time=30" onclick="call('/seek?time=30&amp;api=json'); event.preventDefault();">Seek +30s</a></li>
-		<li><a href="/seek?time=600" onclick="call('/seek?time=600&amp;api=json'); event.preventDefault();">Seek +10m</a></li>
-		<li><a href="/chapter?seek=previous" onclick="call('/chapter?seek=previous&amp;api=json'); event.preventDefault();">Previous chapter</a></li>
-		<li><a href="/chapter?seek=next" onclick="call('/chapter?seek=next&amp;api=json'); event.preventDefault();">Next chapter</a></li>
+		<li><a href="/play" class="api">Play</a></li>
+		<li><a href="/pause" class="api">Pause</a></li>
+		<li><a href="/stop" class="api">Stop</a></li>
+		<li><a href="/seek?time=-600" class="api">Seek -10m</a></li>
+		<li><a href="/seek?time=-30" class="api">Seek -30s</a></li>
+		<li><a href="/seek?time=30" class="api">Seek +30s</a></li>
+		<li><a href="/seek?time=600" class="api">Seek +10m</a></li>
+		<li><a href="/chapter?seek=previous" class="api">Previous chapter</a></li>
+		<li><a href="/chapter?seek=next" class="api">Next chapter</a></li>
 	</ul>
 	<h2>Menu</h2>
 	<ul>
@@ -346,8 +360,7 @@ sub traverse {
 			print '</li>';
 		} elsif (-f $path) {
 			my $url = '/spawn?file=' . escapeHTML(uri_escape(catfile($base, $_)));
-			print "<li><a href=\"/spawn?file=$url\" onclick=\"call('$url&amp;api=json'); event.preventDefault();\">"
-			    . escapeHTML($_) . '</a></li>';
+			print "<li><a href=\"$url\" class=\"api\">" . escapeHTML($_) . '</a></li>';
 		}
 	}
 	print '</ul>';
@@ -488,7 +501,7 @@ sub status {
 		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
 		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
 		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
-		print " <a href=\"/youtube/play?v=$_\" onclick=\"call('/youtube/play?v=$_&amp;api=json'); event.preventDefault();\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
+		print " <a href=\"/youtube/play?v=$_\" class=\"api\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
 		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
 		print '</li>';
 	}
