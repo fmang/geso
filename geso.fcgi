@@ -350,7 +350,7 @@ sub status {
 EOF
 }
 
-my %menu_links = (
+my %menu_titles = (
 	'/' => 'Status',
 	'/library' => 'Library',
 );
@@ -360,14 +360,14 @@ sub menu {
 	my $title = shift;
 	my $found = 0;
 	print '<ul class="menu">';
-	foreach (keys %menu_links) {
+	foreach ('/', '/library') {
 		if ($_ eq $url) {
 			print '<li class="current">';
 			$found = 1;
 		} else {
 			print '<li>';
 		}
-		print "<a href=\"$_\">$menu_links{$_}</a></li>";
+		print "<a href=\"$_\">$menu_titles{$_}</a></li>";
 	}
 	unless ($found and $title) {
 		print '<li class="current"><a>'
