@@ -129,8 +129,7 @@ sub start {
 			if ($title && $href =~ /^\/watch\?v=([^&]+)/) {
 				$video->{title} = $title;
 				$video->{id} = $1;
-				#$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg";
-				$video->{thumbnail} = 'http://192.168.2.100:8080/mqdefault.jpg';
+				$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg";
 			}
 		} elsif ($location eq USER) {
 			$location = USERNAME;
@@ -242,8 +241,7 @@ sub clear {
 
 sub search {
 	my ($query) = @_;
-	#my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
-	my $url = 'http://192.168.2.100:8080/results';
+	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
 	my $ua = LWP::UserAgent->new;
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
