@@ -654,11 +654,11 @@ my %base_env = %ENV;
 my $did_init;
 
 while (new CGI::Fast) {
+	$ENV{$_} = $base_env{$_} foreach keys %base_env;
 	unless ($did_init) {
 		Geso::YouTube::init();
 		$did_init = 1;
 	}
-	$ENV{$_} = $base_env{$_} foreach keys %base_env;
 	Geso::Player::update();
 	Geso::YouTube::update();
 	route();
