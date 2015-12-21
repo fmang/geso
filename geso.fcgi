@@ -363,7 +363,6 @@ sub youtube_status {
 		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
 		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
 		print " <a href=\"/youtube/play?v=$_\" class=\"api\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
-		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
 		print '</td></tr>';
 	}
 	print '</table>';
@@ -552,7 +551,10 @@ sub youtube_download {
 sub youtube_play {
 	my $id = CGI::param('v');
 	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
-	Geso::Player::spawn($file) if $file;
+	if ($file) {
+		Geso::Player::spawn($file);
+		Geso::YouTube::clear($id);
+	}
 	feedback();
 }
 
