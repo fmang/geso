@@ -574,17 +574,21 @@ sub library {
 
 sub youtube_search {
 	my $query = CGI::param('q') or return print CGI::redirect('/');
-	Geso::HTML::header('YouTube search');
-	print '<h2>YouTube results</h2>';
-	print '<ul>';
+	Geso::HTML::header("YouTube: $query");
+	print '<h2>YouTube: ' . escapeHTML($query) . '</h2>';
+	print '<ul class="youtube">';
 	foreach (Geso::YouTube::search($query)) {
-		print '<li>';
-		print "<img src=\"$_->{thumbnail}\" />";
-		print "<a href=\"/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title})) . '">';
-		print escapeHTML($_->{title}) . '</a> ';
-		print escapeHTML("($_->{time}, $_->{views} views) by $_->{user}.");
-		print '<br />' . $_->{description};
-		print '</li>';
+		my $url = "/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title}));
+		print "<li class=\"youtube-$_->{id}\">"
+		. "<a href=\"$url\"><img src=\"$_->{thumbnail}\" /></a>"
+		. "<a class=\"title\" href=\"$url\">"
+		. escapeHTML($_->{title}) . '</a> '
+		. '<div class="meta">'
+		. escapeHTML("by $_->{user}. Duration: $_->{time}. $_->{views} views.")
+		. '</div>'
+		. "<div class=\"description\">$_->{description}</div>"
+		. '<div style="clear:both;"></div>'
+		. '</li>';
 	}
 	print '</ul>';
 }

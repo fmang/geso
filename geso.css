@@ -89,6 +89,7 @@ ul.menu {
 .menu li {
 	display: inline;
 	padding: 1px;
+	line-height: 40px;
 }
 
 .menu li a {
@@ -105,7 +106,10 @@ ul.menu {
 
 .menu form {
 	display: inline;
-	margin-left: 20px;
+}
+
+.menu input[type="text"] {
+	margin-left: 10px;
 }
 
 .menu input {
@@ -141,4 +145,63 @@ ul.menu {
 
 .library li.file {
 	padding: 5px 0;
+}
+
+/******************************************************************************
+/* YouTube
+ */
+
+.youtube {
+	list-style-type: none;
+	padding: 0;
+}
+
+.youtube li {
+	padding: 10px;
+}
+
+.youtube img {
+	width: 320px;
+	display: block;
+	text-align: center;
+}
+
+.youtube img,
+.youtube .title,
+.youtube .meta,
+.youtube .description {
+	padding: 4px 0;
+}
+
+.youtube .title {
+	font-size: 1.2em;
+}
+
+.youtube .meta {
+	color: #65727a;
+}
+
+.youtube .description {
+	font-size: 0.9em;
+}
+
+@media screen and (max-width: 800px) {
+	.youtube img {
+		width: 40%;
+	}
+}
+
+@media screen and (max-width: 500px) {
+	.youtube img {
+		width: 100%;
+		display: block;
+		margin: auto;
+	}
+}
+
+@media screen and (min-width: 500px) {
+	.youtube img {
+		float: left;
+		padding: 0 10px;
+	}
 }
