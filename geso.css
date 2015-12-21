@@ -10,6 +10,10 @@ a {
 	text-decoration: none;
 }
 
+a:hover {
+	color: #23b0f8;
+}
+
 a:focus, a:active {
 	color: #48b4a5;
 }
@@ -124,7 +128,7 @@ ul.menu {
 	padding: 5px;
 }
 
-@media screen and (max-width: 500px) {
+@media screen and (max-width: 600px) {
 	.menu input[type="submit"] {
 		display: none;
 	}
@@ -169,7 +173,14 @@ ul.menu {
 }
 
 .youtube li {
-	padding: 10px;
+	padding: 5px 10px 5px 7px;
+	margin: 5px 0;
+	background-color: #ffffff;
+	border-left: 3px solid #ffffff;
+}
+
+.youtube .running {
+	border-left-color: #FFC96E;
 }
 
 .youtube img {
@@ -197,13 +208,7 @@ ul.menu {
 	font-size: 0.9em;
 }
 
-@media screen and (max-width: 800px) {
-	.youtube img {
-		width: 40%;
-	}
-}
-
-@media screen and (max-width: 500px) {
+@media screen and (max-width: 499px) {
 	.youtube img {
 		width: 100%;
 		display: block;
@@ -213,7 +218,45 @@ ul.menu {
 
 @media screen and (min-width: 500px) {
 	.youtube img {
+		width: 320px;
 		float: left;
-		padding: 0 10px;
+		padding: 0 10px 0 0;
 	}
+	.youtube .meta,
+	.youtube .description {
+		margin-left: 335px;
+	}
+}
+
+@media screen and (min-width: 500px) and (max-width: 800px) {
+	.youtube img {
+		width: 40%;
+	}
+	.youtube .meta,
+	.youtube .description {
+		margin-left: 42%;
+	}
+}
+
+.ytdl:empty:after {
+	content: 'No videos are being downloaded.';
+	font-style: italic;
+	padding-left: 10px;
+}
+
+.ytdl td {
+	padding: 4px 10px;
+}
+
+.ytdl .status {
+	text-transform: capitalize;
+}
+
+.ytdl .canceled .status { color: #E80566; }
+.ytdl .failed .status { color: #D92422; }
+.ytdl .done .status { color: #2DC134; }
+.ytdl .downloading .status { color: #ECA125; }
+
+.ytdl .do a {
+	padding: 5px;
 }

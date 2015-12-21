@@ -129,7 +129,8 @@ sub start {
 			if ($title && $href =~ /^\/watch\?v=([^&]+)/) {
 				$video->{title} = $title;
 				$video->{id} = $1;
-				$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg"
+				#$video->{thumbnail} = "//i.ytimg.com/vi/$1/mqdefault.jpg";
+				$video->{thumbnail} = 'http://192.168.2.100:8080/mqdefault.jpg';
 			}
 		} elsif ($location eq USER) {
 			$location = USERNAME;
@@ -241,7 +242,8 @@ sub clear {
 
 sub search {
 	my ($query) = @_;
-	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
+	#my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
+	my $url = 'http://192.168.2.100:8080/results';
 	my $ua = LWP::UserAgent->new;
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
@@ -270,7 +272,7 @@ sub header {
 		<title>$html_title</title>
 		<meta charset="utf-8" />
 		<meta name="robots" content="noindex, nofollow" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=500" />
 		<link rel="stylesheet" type="text/css" href="/geso.css" />
 		<script>
 			function update(info) {
@@ -292,15 +294,15 @@ sub header {
 			function dynamize() {
 				var links = document.getElementsByClassName("api");
 				for (var i = 0; i < links.length; i++) {
-					links[i].onclick = function(e) {
-						var url = e.target.href;
+					links[i].addEventListener('click', function(e) {
+						var url = this.href;
 						if (url.indexOf("?") == -1)
 							url += "?api=json";
 						else
 							url += "&api=json";
 						call(url);
 						e.preventDefault();
-					}
+					});
 				}
 			}
 		</script>
@@ -348,6 +350,23 @@ sub status {
 		</div>
 	</div>
 EOF
+}
+
+sub youtube_status {
+	print '<table class="ytdl">';
+	foreach (keys %Geso::YouTube::downloads) {
+		my $dl = $Geso::YouTube::downloads{$_};
+		print "<tr class=\"$dl->{status}\">"
+		. '<td class="name">' . escapeHTML($dl->{name}) . '</td>'
+		. '<td class="status">' . $dl->{status} . '</td>'
+		. '<td class="do">';
+		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
+		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
+		print " <a href=\"/youtube/play?v=$_\" class=\"api\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
+		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
+		print '</td></tr>';
+	}
+	print '</table>';
 }
 
 my %menu_titles = (
@@ -547,25 +566,15 @@ use URI::Escape qw(uri_escape);
 
 sub status {
 	Geso::HTML::header('Status');
-	print '<h2>YouTube</h2><ul>';
-	foreach (keys %Geso::YouTube::downloads) {
-		my $dl = $Geso::YouTube::downloads{$_};
-		print '<li>' . escapeHTML("$_ - $dl->{name} ($dl->{status})");
-		print " <a href=\"/youtube/cancel?v=$_\">Cancel</a>" if $dl->{status} eq Geso::YouTube::DOWNLOADING;
-		print " <a href=\"/youtube/download?v=$_\">Restart</a>" if $dl->{status} eq Geso::YouTube::CANCELED || $dl->{status} eq Geso::YouTube::FAILED;
-		print " <a href=\"/youtube/play?v=$_\" class=\"api\">Play</a>" if $dl->{status} eq Geso::YouTube::DONE;
-		print " <a href=\"/youtube/clear?v=$_\">Clear</a>" if $dl->{status} ne Geso::YouTube::DOWNLOADING;
-		print '</li>';
-	}
-	print <<"EOF";
-	</ul>
-EOF
+	print '<h2>YouTube</h2>';
+	Geso::HTML::youtube_status();
 	Geso::HTML::footer();
 }
 
 sub library {
 	Geso::HTML::header('Library');
-	print '<h2>Library</h2><div class="library">';
+	print '<h2>Library</h2>'
+	. '<div class="library">';
 	my $root = $ENV{DOCUMENT_ROOT};
 	Geso::HTML::traverse($root, '.');
 	print '</div>';
@@ -579,13 +588,16 @@ sub youtube_search {
 	print '<ul class="youtube">';
 	foreach (Geso::YouTube::search($query)) {
 		my $url = "/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title}));
-		print "<li class=\"youtube-$_->{id}\">"
-		. "<a href=\"$url\"><img src=\"$_->{thumbnail}\" /></a>"
-		. "<a class=\"title\" href=\"$url\">"
+		if ($Geso::YouTube::downloads{$_->{id}}) {
+			print '<li class="running">';
+		} else {
+			print '<li>';
+		}
+		my $views = $_->{views} =~ s/(?<=\d)(?=(?:\d\d\d)+\b)/\&nbsp;/gr;
+		print "<img src=\"$_->{thumbnail}\" />"
+		. "<a class=\"api title\" href=\"$url\" onclick=\"this.parentNode.className='running';\">"
 		. escapeHTML($_->{title}) . '</a> '
-		. '<div class="meta">'
-		. escapeHTML("by $_->{user}. Duration: $_->{time}. $_->{views} views.")
-		. '</div>'
+		. "<div class=\"meta\">by $_->{user}. Duration: $_->{time}. $views views.</div>"
 		. "<div class=\"description\">$_->{description}</div>"
 		. '<div style="clear:both;"></div>'
 		. '</li>';
