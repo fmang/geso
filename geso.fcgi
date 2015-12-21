@@ -153,8 +153,8 @@ sub text {
 	if ($location eq TIME) {
 		$video->{time} = $text;
 	} elsif ($location eq META) {
-		if ($text =~ /^[0-9]/) {
-			my @seqs = $text =~ /([0-9]+)/g;
+		if ($text =~ /^\d/) {
+			my @seqs = $text =~ /(\d+)/g;
 			$video->{views} = join('', @seqs);
 		}
 	} elsif ($location eq DESCRIPTION) {
@@ -248,6 +248,16 @@ sub search {
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
 		return Geso::YouTube::Parser::parse($res->content);
+	}
+}
+
+sub init {
+	# Find the canceled downloads.
+	foreach (glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', '*.part')) {
+		my ($vol, $dir, $file) = File::Spec->splitpath($_);
+		if ($file =~ /^(.+)\.([a-zA-Z0-9_\-]+)\.[^.]+\.part$/) {
+			$downloads{$2} = { name => $1, status => CANCELED };
+		}
 	}
 }
 
@@ -503,7 +513,7 @@ sub spawn {
 
 sub seek {
 	my $time = CGI::param('time');
-	if ($time =~ /^[-+]?[0-9]+$/) {
+	if ($time =~ /^[-+]?\d+$/) {
 		Geso::Player::seek($time);
 		feedback();
 	} else {
@@ -643,8 +653,13 @@ sub route {
 }
 
 my %base_env = %ENV;
+my $did_init;
 
 while (new CGI::Fast) {
+	unless ($did_init) {
+		Geso::YouTube::init();
+		$did_init = 1;
+	}
 	$ENV{$_} = $base_env{$_} foreach keys %base_env;
 	Geso::Player::update();
 	Geso::YouTube::update();
