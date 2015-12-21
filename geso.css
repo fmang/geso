@@ -5,6 +5,19 @@ body {
 	background-color: #f4f1ea;
 }
 
+a {
+	color: #0390e8;
+	text-decoration: none;
+}
+
+a:focus, a:active {
+	color: #48b4a5;
+}
+
+/******************************************************************************
+/* State
+ */
+
 #state {
 	background-color: #255a62;
 	color: #f4f1ea;
@@ -15,12 +28,12 @@ body {
 	padding: 1px;
 }
 
-.status {
+#state .statusline {
 	padding-bottom: 5px;
 	border-bottom: 1px solid #48b4a5;
 }
 
-.status, .actions {
+#state .statusline, #state .actions {
 	margin: 10px;
 }
 
@@ -42,11 +55,11 @@ body {
 	font-style: italic;
 }
 
-.actions {
+#state .actions {
 	line-height: 1.5em;
 }
 
-.actions a {
+#state .actions a {
 	color: #93cadf;
 	padding: 0 10px;
 }
@@ -57,19 +70,75 @@ body {
 	color: #ccc;
 }
 
-.actions .section {
+#state .actions .section {
 	display: block;
 }
 
-.actions .section b {
+#state .actions .section b {
 	padding-right: 10px;
 }
 
-a {
-	color: #0390e8;
-	text-decoration: none;
+/******************************************************************************
+/* Menu
+ */
+
+ul.menu {
+	padding: 0;
 }
 
-a:focus {
-	color: #48b4a5;
+.menu li {
+	display: inline;
+	padding: 1px;
+}
+
+.menu li a {
+	padding: 10px;
+}
+
+.menu .current a {
+	background-color: #4bafc9;
+}
+
+.menu .current a {
+	color: #f4f1ea;
+}
+
+.menu form {
+	display: inline;
+	margin-left: 20px;
+}
+
+.menu input {
+	background-color: #f4f1ea;
+	border: 1px solid #48b4a5;
+	padding: 5px;
+}
+
+/******************************************************************************
+/* Library
+ */
+
+.library {
+	padding: 0 10px;
+}
+
+.library ul {
+	list-style-type: none;
+	padding-left: 0;
+}
+
+.library ul ul {
+	padding-left: 25px;
+}
+
+.library li.dir {
+	padding: 5px 0;
+}
+
+.library li.dir span {
+	font-weight: bold;
+}
+
+.library li.file {
+	padding: 5px 0;
 }

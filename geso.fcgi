@@ -262,12 +262,12 @@ use URI::Escape qw(uri_escape);
 sub header {
 	my $title = shift;
 	print CGI::header(-type => 'text/html', -charset => 'utf-8', @_);
-	$title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
+	my $html_title = $title ? escapeHTML($title) . ' - Geso' : 'Geso';
 	print <<"EOF";
 <!doctype html>
 <html>
 	<head>
-		<title>$title</title>
+		<title>$html_title</title>
 		<meta charset="utf-8" />
 		<meta name="robots" content="noindex, nofollow" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -308,7 +308,7 @@ sub header {
 	<body onload="dynamize();">
 EOF
 	status();
-	menu();
+	menu($title);
 }
 
 sub status {
@@ -322,7 +322,7 @@ sub status {
 	}
 	print <<"EOF";
 	<div id="state" class="$Geso::Player::state{status}">
-		<div class="status">
+		<div class="statusline">
 			<span id="status">$Geso::Player::state{status}</span>
 			<span id="file">$file</span>
 		</div>
@@ -350,16 +350,35 @@ sub status {
 EOF
 }
 
+my %menu_links = (
+	'/' => 'Status',
+	'/library' => 'Library',
+);
+
 sub menu {
-	print <<"EOF";
-	<h2>Menu</h2>
-	<ul>
-		<li><a href="/">Status</a></li>
-		<li><a href="/library">Library</a></li>
-		<li>
+	my $url = CGI::url(-absolute => 1, -query => 1);
+	my $title = shift;
+	my $found = 0;
+	print '<ul class="menu">';
+	foreach (keys %menu_links) {
+		if ($_ eq $url) {
+			print '<li class="current">';
+			$found = 1;
+		} else {
+			print '<li>';
+		}
+		print "<a href=\"$_\">$menu_links{$_}</a></li>";
+	}
+	unless ($found and $title) {
+		print '<li class="current"><a>'
+		. escapeHTML($title)
+		. '</a></li>';
+	}
+	print <<EOF;
+		<li class="youtube">
 			<form action="/youtube/search">
-				<input name="q" />
-				<input type="submit" value="YouTube search" />
+				<input type="text" name="q" placeholder="YouTube" />
+				<input type="submit" value="Search" />
 			</form>
 		</li>
 	</ul>
@@ -383,12 +402,12 @@ sub traverse {
 		next if /^\./;
 		my $path = catfile($root, $base, $_);
 		if (-d $path) {
-			print '<li><span>' . escapeHTML($_) . '</span>';
+			print '<li class="dir"><span>' . escapeHTML($_) . '</span>';
 			traverse($root, catdir($base, $_));
 			print '</li>';
 		} elsif (-f $path) {
 			my $url = '/spawn?file=' . escapeHTML(uri_escape(catfile($base, $_)));
-			print "<li><a href=\"$url\" class=\"api\">" . escapeHTML($_) . '</a></li>';
+			print "<li class=\"file\"><a href=\"$url\" class=\"api\">" . escapeHTML($_) . '</a></li>';
 		}
 	}
 	print '</ul>';
@@ -546,9 +565,10 @@ EOF
 
 sub library {
 	Geso::HTML::header('Library');
-	print '<h2>Library</h2>';
+	print '<h2>Library</h2><div class="library">';
 	my $root = $ENV{DOCUMENT_ROOT};
 	Geso::HTML::traverse($root, '.');
+	print '</div>';
 	Geso::HTML::footer();
 }
 
