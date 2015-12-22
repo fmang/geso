@@ -241,7 +241,8 @@ sub clear {
 
 sub search {
 	my ($query) = @_;
-	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query);
+	my $url = 'https://www.youtube.com/results?search_query=' . uri_escape($query) . '&gl=US';
+	# gl=US is worldwide according to YouTube
 	my $ua = LWP::UserAgent->new;
 	my $res = $ua->get($url);
 	if ($res->is_success && $res->code == 200) {
