@@ -185,7 +185,6 @@ ul.menu {
 
 .youtube img {
 	width: 320px;
-	display: block;
 	text-align: center;
 }
 
@@ -193,6 +192,7 @@ ul.menu {
 .youtube .title,
 .youtube .meta,
 .youtube .description {
+	display: block;
 	padding: 4px 0;
 }
 
@@ -222,6 +222,7 @@ ul.menu {
 		float: left;
 		padding: 0 10px 0 0;
 	}
+	.youtube .title,
 	.youtube .meta,
 	.youtube .description {
 		margin-left: 335px;
@@ -232,6 +233,7 @@ ul.menu {
 	.youtube img {
 		width: 40%;
 	}
+	.youtube .title,
 	.youtube .meta,
 	.youtube .description {
 		margin-left: 42%;
