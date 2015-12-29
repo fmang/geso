@@ -621,15 +621,16 @@ sub youtube_search {
 	print '<h2>YouTube: ' . escapeHTML($query) . '</h2>';
 	print '<ul class="youtube">';
 	foreach (Geso::YouTube::search($query)) {
-		my $url = "/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title}));
+		my $dw_url = "/youtube/download?v=$_->{id}&name=" . escapeHTML(uri_escape($_->{title}));
 		if ($Geso::YouTube::downloads{$_->{id}}) {
 			print '<li class="running">';
 		} else {
 			print '<li>';
 		}
 		my $views = $_->{views} =~ s/(?<=\d)(?=(?:\d\d\d)+\b)/\&nbsp;/gr;
-		print "<img src=\"$_->{thumbnail}\" />"
-		. "<a class=\"api title\" href=\"$url\" onclick=\"this.parentNode.className='running';\">"
+		print "<a class=\"api\" href=\"/youtube/play?v=$_->{id}\" onclick=\"this.parentNode.className='playing';\">"
+		. "<img src=\"$_->{thumbnail}\" /></a>"
+		. "<a class=\"api title\" href=\"$dw_url\" onclick=\"this.parentNode.className='running';\">"
 		. escapeHTML($_->{title}) . '</a> '
 		. "<div class=\"meta\">by $_->{user}. Duration: $_->{time}. $views views.</div>"
 		. "<div class=\"description\">$_->{description}</div>"

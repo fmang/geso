@@ -179,9 +179,8 @@ ul.menu {
 	border-left: 3px solid #ffffff;
 }
 
-.youtube .running {
-	border-left-color: #FFC96E;
-}
+.youtube .playing { border-left-color: #5BA9EA; }
+.youtube .running { border-left-color: #FFC96E; }
 
 .youtube img {
 	width: 320px;
