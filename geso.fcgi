@@ -559,9 +559,9 @@ sub youtube_download {
 
 sub youtube_play {
 	my $id = CGI::param('v');
-	my $file = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
-	if ($file) {
-		Geso::Player::spawn($file);
+	my @files = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
+	if (@files) {
+		Geso::Player::spawn(shift @files);
 		Geso::YouTube::clear($id);
 	}
 	feedback();
