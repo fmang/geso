@@ -372,11 +372,6 @@ sub status {
 				<a href="/seek?time=30" class="api on" title="Forward 30 seconds">+30s</a>
 				<a href="/seek?time=600" class="api on" title="Forward 10 minutes">+10m</a>
 			</span>
-			<span class="section">
-				<b>Chapter</b>
-				<a href="/chapter?seek=previous" class="api on" title="Previous chapter">Previous</a>
-				<a href="/chapter?seek=next" class="api on" title="Next chapter">Next</a>
-			</span>
 		</div>
 	</div>
 EOF
