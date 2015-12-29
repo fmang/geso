@@ -38,10 +38,11 @@ sub reset_state {
 
 sub spawn {
 	stop() if $state{status} ne OFF;
+	delete $state{youtube};
+	delete $state{title};
 	my $arg = shift;
 	$state{file} = $arg;
-	if ($arg =~ /^-/) { $arg = "./$arg"; }
-	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', $arg) . ' > /dev/null');
+	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', '--', $arg) . ' > /dev/null');
 	$state{status} = PLAYING;
 }
 
@@ -187,6 +188,7 @@ package Geso::YouTube;
 
 use File::Spec::Functions;
 use LWP::UserAgent ();
+use String::ShellQuote qw(shell_quote);
 use URI::Escape qw(uri_escape);
 use POSIX ":sys_wait_h";
 
@@ -260,6 +262,24 @@ sub init {
 	}
 }
 
+sub get {
+	my ($id) = @_;
+	open(my $out, '-|', shell_quote('youtube-dl', '--get-title', '--get-url', '--', $id));
+	my ($title, $url) = <$out>;
+	close $out;
+	chomp ($title, $url);
+	return ($title, $url);
+}
+
+sub play {
+	my ($id) = @_;
+	my ($title, $url) = Geso::YouTube::get($id);
+	Geso::Player::spawn($url);
+	delete $Geso::Player::state{file};
+	$Geso::Player::state{youtube} = $id;
+	$Geso::Player::state{title} = $title;
+}
+
 #-------------------------------------------------------------------------------
 # HTML
 
@@ -329,7 +349,8 @@ sub status {
 		$file =~ s|/| / |g;
 		$file = escapeHTML($file);
 	} else {
-		$file = '';
+		$file = $Geso::Player::state{title};
+		unless ($file) { $file = ''; }
 	}
 	print <<"EOF";
 	<div id="state" class="$Geso::Player::state{status}">
@@ -464,7 +485,7 @@ sub api_status {
 	}
 	print to_json {
 		status => $Geso::Player::state{status},
-		file => $file,
+		file => $file ? $file : $Geso::Player::state{title},
 	};
 }
 
@@ -479,7 +500,12 @@ sub feedback {
 sub play {
 	if ($Geso::Player::state{status} eq Geso::Player::OFF) {
 		my $f = $Geso::Player::state{file};
-		Geso::Player::spawn($f) if $f;
+		my $yt = $Geso::Player::state{youtube};
+		if ($f) {
+			Geso::Player::spawn($f);
+		} elsif ($yt) {
+			Geso::YouTube::play($yt);
+		}
 	} else {
 		Geso::Player::play();
 	}
@@ -563,6 +589,8 @@ sub youtube_play {
 	if (@files) {
 		Geso::Player::spawn(shift @files);
 		Geso::YouTube::clear($id);
+	} else {
+		Geso::YouTube::play($id);
 	}
 	feedback();
 }
