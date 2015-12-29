@@ -71,7 +71,7 @@ a:focus, a:active {
 
 #state .actions a {
 	color: #93cadf;
-	padding: 0 10px;
+	padding: 2px 10px;
 }
 
 #state.off .actions a.on,
