@@ -412,7 +412,7 @@ sub menu {
 		}
 		print "<a href=\"$_\">$menu_titles{$_}</a></li>";
 	}
-	unless ($found and $title) {
+	if (!$found && $title) {
 		print '<li class="current"><a>'
 		. escapeHTML($title)
 		. '</a></li>';
@@ -605,7 +605,7 @@ use CGI qw(escapeHTML);
 use URI::Escape qw(uri_escape);
 
 sub status {
-	Geso::HTML::header('Status');
+	Geso::HTML::header();
 	print '<h2>YouTube</h2>';
 	Geso::HTML::youtube_status();
 	Geso::HTML::footer();
