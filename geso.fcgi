@@ -580,6 +580,12 @@ sub youtube_download {
 
 sub youtube_play {
 	my $id = CGI::param('v');
+	my $current = $Geso::Player::state{youtube};
+	if ($current && $current eq $id) {
+		Geso::Player::play();
+		feedback();
+		return;
+	}
 	my @files = glob catfile($ENV{DOCUMENT_ROOT}, 'youtube', "*.$id.*");
 	if (@files) {
 		Geso::Player::spawn(shift @files);
