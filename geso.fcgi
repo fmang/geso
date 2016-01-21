@@ -9,6 +9,7 @@ use locale;
 
 package Geso::Player;
 
+use File::Spec;
 use IO::Handle;
 use String::ShellQuote qw(shell_quote);
 use POSIX ":sys_wait_h";
@@ -41,8 +42,14 @@ sub spawn {
 	delete $state{youtube};
 	delete $state{title};
 	my $arg = shift;
+	my $command = 'omxplayer';
+	unless ($arg =~ /^[a-z]+:\/\//) {
+		my ($vol, $dir, $file) = File::Spec->splitpath($arg);
+		my $play = File::Spec->catpath($vol, $dir, '.play');
+		$command = $play if -x $play;
+	}
 	$state{file} = $arg;
-	$state{pid} = open($state{in}, '|-', shell_quote('omxplayer', '--', $arg) . ' > /dev/null');
+	$state{pid} = open($state{in}, '|-', shell_quote($command, $arg) . ' > /dev/null');
 	$state{status} = PLAYING;
 }
 
