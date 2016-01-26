@@ -27,7 +27,7 @@ our %state = (
 sub command {
 	return if $state{status} eq OFF;
 	my $fh = $state{in};
-	print $fh shift;
+	print $fh (shift . "\n");
 	$fh->flush();
 }
 
@@ -42,14 +42,14 @@ sub spawn {
 	delete $state{youtube};
 	delete $state{title};
 	my $arg = shift;
-	my $command = 'omxplayer';
+	my $command = 'mpv --really-quiet --no-input-terminal --input-file=/dev/stdin --';
 	unless ($arg =~ /^[a-z]+:\/\//) {
 		my ($vol, $dir, $file) = File::Spec->splitpath($arg);
 		my $play = File::Spec->catpath($vol, $dir, '.play');
 		$command = $play if -x $play;
 	}
 	$state{file} = $arg;
-	$state{pid} = open($state{in}, '|-', shell_quote($command, $arg) . ' > /dev/null');
+	$state{pid} = open($state{in}, '|-', $command . ' ' . shell_quote($arg) . ' > /dev/null');
 	$state{status} = PLAYING;
 }
 
@@ -61,35 +61,21 @@ sub update {
 
 sub stop {
 	return if $state{status} eq OFF;
-	command('q');
+	command('quit');
 	my $kid = waitpid($state{pid}, 0);
 	reset_state() if $kid > 0;
 }
 
 sub play {
 	return if $state{status} eq OFF;
-	command(' ') if $state{status} eq PAUSED;
+	command('pause') if $state{status} eq PAUSED;
 	$state{status} = PLAYING;
 }
 
 sub pause {
 	return if $state{status} eq OFF;
-	command(' ') if $state{status} eq PLAYING;
+	command('pause') if $state{status} eq PLAYING;
 	$state{status} = PAUSED;
-}
-
-sub seek {
-	return if $state{status} eq OFF;
-	use integer;
-	my $time = shift;
-	my $abstime = abs($time);
-	my $big_steps = $abstime / 600;
-	my $small_steps = ($abstime % 600) / 30;
-	if ($time >= 30) {
-		command(("\027[A" x $big_steps) . ("\027[C" x $small_steps));
-	} elsif ($time <= -30) {
-		command(("\027[B" x $big_steps) . ("\027[D" x $small_steps));
-	}
 }
 
 #-------------------------------------------------------------------------------
@@ -374,10 +360,10 @@ sub status {
 			</span>
 			<span class="section">
 				<b>Seek</b>
-				<a href="/seek?time=-600" class="api on" title="Rewind 10 minutes">-10m</a>
+				<a href="/seek?time=-300" class="api on" title="Rewind 5 minutes">-5m</a>
 				<a href="/seek?time=-30" class="api on" title="Rewind 30 seconds">-30s</a>
 				<a href="/seek?time=30" class="api on" title="Forward 30 seconds">+30s</a>
-				<a href="/seek?time=600" class="api on" title="Forward 10 minutes">+10m</a>
+				<a href="/seek?time=300" class="api on" title="Forward 5 minutes">+5m</a>
 			</span>
 		</div>
 	</div>
@@ -461,7 +447,19 @@ sub traverse {
 		}
 	}
 	print '</ul>';
+}
 
+sub commands {
+	print <<EOF;
+	<ul class="commands">
+		<li><a href="/seek?time=-1800" class="api">Seek -30 minutes.</a></li>
+		<li><a href="/seek?time=1800" class="api">Seek +30 minutes.</a></li>
+		<li><a href="/chapter?seek=-1" class="api">Previous chapter.</a></li>
+		<li><a href="/chapter?seek=1" class="api">Next chapter.</a></li>
+		<li><a href="/audio?cycle=up" class="api">Cycle audio tracks.</a></li>
+		<li><a href="/subtitles?cycle=up" class="api">Cycle subtitles.</a></li>
+	</ul>
+EOF
 }
 
 #-------------------------------------------------------------------------------
@@ -475,7 +473,7 @@ use JSON;
 sub forbidden {
 	my ($msg) = @_;
 	print CGI::header(-type => 'text/plain', -charset => 'utf-8', -status => '403 Forbidden');
-	print "403 Forbidden\n$msg";
+	print "403 Forbidden\n$msg\n";
 }
 
 sub api_status {
@@ -534,32 +532,48 @@ sub spawn {
 		Geso::Player::spawn(catfile($root, $file));
 		feedback();
 	} else {
-		forbidden("Shady path.\n");
+		forbidden("Shady path.");
 	}
 }
 
 sub seek {
 	my $time = CGI::param('time');
 	if ($time =~ /^[-+]?\d+$/) {
-		Geso::Player::seek($time);
+		Geso::Player::command("seek $time");
 		feedback();
 	} else {
-		forbidden("Invalid time $time.\n");
+		forbidden("Invalid time $time.");
 	}
 }
 
 sub chapter {
 	my $seek = CGI::param('seek');
-	if ($Geso::Player::state{status} ne Geso::Player::OFF) {
-		if ($seek eq 'next') {
-			Geso::Player::command('o');
-		} elsif ($seek eq 'previous') {
-			Geso::Player::command('i');
-		} else {
-			return forbidden("Invalid direction.\n");
-		}
+	if ($seek =~ /^[-+]?\d+$/) {
+		Geso::Player::command("add chapter $seek");
+		feedback();
+	} else {
+		forbidden("Invalid direction $seek.");
 	}
-	feedback();
+}
+
+sub audio {
+	my $cycle = CGI::param('cycle');
+	if ($cycle eq 'up' || $cycle eq 'down') {
+		Geso::Player::command("cycle audio $cycle");
+		feedback();
+	} else {
+		forbidden('Invalid audio selection.');
+	}
+}
+
+sub subtitles {
+	my $cycle = CGI::param('cycle');
+	if ($cycle eq 'up' || $cycle eq 'down') {
+		Geso::Player::command("cycle sub $cycle");
+		feedback();
+	} else {
+		forbidden('Invalid subtitles selection.');
+	}
 }
 
 sub youtube_cancel {
@@ -615,6 +629,8 @@ sub status {
 	Geso::HTML::header();
 	print '<h2>YouTube</h2>';
 	Geso::HTML::youtube_status();
+	print '<h2>Advanced commands</h2>';
+	Geso::HTML::commands();
 	Geso::HTML::footer();
 }
 
@@ -670,6 +686,8 @@ my %pages = (
 	'/spawn' => \&Geso::Actions::spawn,
 	'/seek' => \&Geso::Actions::seek,
 	'/chapter' => \&Geso::Actions::chapter,
+	'/audio' => \&Geso::Actions::audio,
+	'/subtitles' => \&Geso::Actions::subtitles,
 	'/youtube/search' => \&Geso::Pages::youtube_search,
 	'/youtube/cancel' => \&Geso::Actions::youtube_cancel,
 	'/youtube/clear' => \&Geso::Actions::youtube_clear,
