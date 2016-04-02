@@ -42,7 +42,7 @@ sub spawn {
 	delete $state{youtube};
 	delete $state{title};
 	my $arg = shift;
-	my $command = 'mpv --really-quiet --no-input-terminal --input-file=/dev/stdin --';
+	my $command = shell_quote('mpv', "--config-dir=$ENV{DOCUMENT_ROOT}/.mpv", '--really-quiet', '--no-input-terminal', '--input-file=/dev/stdin', '--');
 	unless ($arg =~ /^[a-z]+:\/\//) {
 		my ($vol, $dir, $file) = File::Spec->splitpath($arg);
 		my $play = File::Spec->catpath($vol, $dir, '.play');
