@@ -626,6 +626,9 @@ use CGI qw(escapeHTML);
 use URI::Escape qw(uri_escape);
 
 sub status {
+	if (CGI::param('api')) {
+		return Geso::Actions::api_status();
+	}
 	Geso::HTML::header();
 	print '<h2>YouTube</h2>';
 	Geso::HTML::youtube_status();
