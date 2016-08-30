@@ -517,6 +517,14 @@ sub pause {
 	feedback();
 }
 
+sub play_pause {
+	if ($Geso::Player::state{status} eq Geso::Player::PLAYING) {
+		pause();
+	} else {
+		play();
+	}
+}
+
 sub stop {
 	Geso::Player::stop();
 	feedback();
@@ -685,6 +693,7 @@ my %pages = (
 	'/library' => \&Geso::Pages::library,
 	'/play' => \&Geso::Actions::play,
 	'/pause' => \&Geso::Actions::pause,
+	'/playpause' => \&Geso::Actions::play_pause,
 	'/stop' => \&Geso::Actions::stop,
 	'/spawn' => \&Geso::Actions::spawn,
 	'/seek' => \&Geso::Actions::seek,
