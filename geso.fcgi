@@ -587,12 +587,12 @@ sub subtitles {
 }
 
 sub playlist_next {
-	Geso::Player::command("playlist-next");
+	Geso::Player::command("playlist-next force");
 	feedback();
 }
 
 sub playlist_prev {
-	Geso::Player::command("playlist-prev");
+	Geso::Player::command("playlist-prev force");
 	feedback();
 }
 
