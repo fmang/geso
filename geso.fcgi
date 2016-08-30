@@ -456,6 +456,8 @@ sub commands {
 		<li><a href="/seek?time=1800" class="api">Seek +30 minutes.</a></li>
 		<li><a href="/chapter?seek=-1" class="api">Previous chapter.</a></li>
 		<li><a href="/chapter?seek=1" class="api">Next chapter.</a></li>
+		<li><a href="/playlist/prev" class="api">Previous video.</a></li>
+		<li><a href="/playlist/next" class="api">Next video.</a></li>
 		<li><a href="/audio?cycle=up" class="api">Cycle audio tracks.</a></li>
 		<li><a href="/subtitles?cycle=up" class="api">Cycle subtitles.</a></li>
 	</ul>
@@ -584,6 +586,16 @@ sub subtitles {
 	}
 }
 
+sub playlist_next {
+	Geso::Player::command("playlist-next");
+	feedback();
+}
+
+sub playlist_prev {
+	Geso::Player::command("playlist-prev");
+	feedback();
+}
+
 sub youtube_cancel {
 	my $id = CGI::param('v');
 	Geso::YouTube::cancel($id) if $id;
@@ -700,6 +712,8 @@ my %pages = (
 	'/chapter' => \&Geso::Actions::chapter,
 	'/audio' => \&Geso::Actions::audio,
 	'/subtitles' => \&Geso::Actions::subtitles,
+	'/playlist/next' => \&Geso::Actions::playlist_next,
+	'/playlist/prev' => \&Geso::Actions::playlist_prev,
 	'/youtube/search' => \&Geso::Pages::youtube_search,
 	'/youtube/cancel' => \&Geso::Actions::youtube_cancel,
 	'/youtube/clear' => \&Geso::Actions::youtube_clear,
