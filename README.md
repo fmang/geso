@@ -9,6 +9,14 @@ there's hardly any error reporting, or robustness whatsoever. If you need
 authentication, you'll have to use your webservers' facilities like HTTP Basic
 Auth.
 
+Features
+--------
+
+- Playback controls.
+- Directory listing.
+- YouTube support: searching, and streaming using youtube-dl.
+- An undocumented but simple REST API.
+
 Dependencies
 ------------
 
