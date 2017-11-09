@@ -5,7 +5,9 @@ Geso is a web interface to control multimedia players. It lets you browse and
 play videos in a specific directory, and also search and play YouTube videos.
 
 It's quick and dirty, so while I hope there are no critical security issues,
-there's hardly any error reporting, or robustness whatsoever.
+there's hardly any error reporting, or robustness whatsoever. If you need
+authentication, you'll have to use your webservers' facilities like HTTP Basic
+Auth.
 
 Dependencies
 ------------
